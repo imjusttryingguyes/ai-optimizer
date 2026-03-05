@@ -1,0 +1,27 @@
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: aiopt_postgres
+    restart: always
+
+    environment:
+      POSTGRES_DB: aiopt
+      POSTGRES_USER: aiopt
+      POSTGRES_PASSWORD: strongpassword123
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    command: >
+      postgres
+      -c shared_buffers=1GB
+      -c work_mem=32MB
+      -c maintenance_work_mem=256MB
+      -c effective_cache_size=3GB
+
+volumes:
+  postgres_data:
