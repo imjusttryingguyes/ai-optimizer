@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from insight_utils import insert_insight
+
 
 def get_conn():
 	return psycopg2.connect(
@@ -142,6 +144,22 @@ def main():
 		print(f"💸 SPEND WITHOUT CONVERSIONS (cost >= {fmt_money(waste_cost_no_conv)})")
 		for placement, cost, clicks in waste[:15]:
 			print(f"- {placement}: spend {fmt_money(cost)} | clicks {int(clicks)} | conv 0")
+			insert_insight(
+				account_id=acct_id,
+				type="RSYA_WASTE",
+				entity_type="placement",
+				entity_id=placement,
+				severity=80,
+				impact_rub=cost,
+				title=f"Spend without conversions on {placement}",
+				description=f"Placement spent {cost:.0f} ₽ with {clicks} clicks and 0 conversions",
+				recommendation="Consider excluding this placement from RSYA",
+				evidence={
+					"clicks": clicks,
+					"cost": cost,
+					"conv": conv
+				}
+			)
 		print("")
 	else:
 		print("✅ No big spend-without-conv placements\n")
