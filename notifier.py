@@ -49,8 +49,8 @@ def main():
 		recommendation
 	FROM insights
 	WHERE status='new'
-	ORDER BY impact_rub DESC
-	LIMIT 20
+	ORDER BY impact_rub * confidence DESC
+	LIMIT 10
 	""")
 
 	rows = cur.fetchall()

@@ -1,3 +1,6 @@
+print("RUNNING FILE:", __file__)
+print("RUNNING VERSION: DEBUG_20260305_1")
+
 import os
 import math
 import psycopg2
@@ -144,12 +147,14 @@ def main():
 		print(f"💸 SPEND WITHOUT CONVERSIONS (cost >= {fmt_money(waste_cost_no_conv)})")
 		for placement, cost, clicks in waste[:15]:
 			print(f"- {placement}: spend {fmt_money(cost)} | clicks {int(clicks)} | conv 0")
+			confidence = min(1.0, clicks / 100)
+			print("DEBUG INSIGHT:", placement, "clicks", clicks, "confidence", confidence, "cost", cost)
 			insert_insight(
 				account_id=acct_id,
 				type="RSYA_WASTE",
 				entity_type="placement",
 				entity_id=placement,
-				severity=80,
+				severity=80 * confidence,
 				impact_rub=cost,
 				title=f"Spend without conversions on {placement}",
 				description=f"Placement spent {cost:.0f} ₽ with {clicks} clicks and 0 conversions",
@@ -158,7 +163,8 @@ def main():
 					"clicks": clicks,
 					"cost": cost,
 					"conv": conv
-				}
+				},
+				confidence=confidence
 			)
 		print("")
 	else:
