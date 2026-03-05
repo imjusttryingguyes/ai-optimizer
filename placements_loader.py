@@ -75,6 +75,7 @@ def fetch_direct_report_tsv(
 		"Impressions",
 		"Clicks",
 		"Cost",
+		"Conversions",
 	]
 
 	selection = {
