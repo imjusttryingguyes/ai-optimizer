@@ -29,6 +29,7 @@ def insert_insight(
 	recommendation: str | None,
 	evidence: dict | None,
 	confidence: float = 1.0,
+	insight_date: str | None = None,	# 'YYYY-MM-DD' или None (= created_at::date)
 ):
 	conn = get_conn()
 	cur = conn.cursor()
@@ -46,9 +47,21 @@ def insert_insight(
 			title,
 			description,
 			recommendation,
-			evidence
+			evidence,
+			insight_date,
+			updated_at
 		)
-		VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+		VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s::date, CURRENT_DATE), now())
+		ON CONFLICT (account_id, type, entity_type, entity_id, insight_date)
+		DO UPDATE SET
+			severity = EXCLUDED.severity,
+			impact_rub = EXCLUDED.impact_rub,
+			confidence = EXCLUDED.confidence,
+			title = EXCLUDED.title,
+			description = EXCLUDED.description,
+			recommendation = EXCLUDED.recommendation,
+			evidence = EXCLUDED.evidence,
+			updated_at = now()
 		""",
 		(
 			account_id,
@@ -62,6 +75,7 @@ def insert_insight(
 			description,
 			recommendation,
 			json.dumps(evidence or {}, ensure_ascii=False),
+			insight_date,
 		),
 	)
 

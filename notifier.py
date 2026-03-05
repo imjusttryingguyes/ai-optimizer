@@ -49,6 +49,7 @@ def main():
 		recommendation
 	FROM insights
 	WHERE status='new'
+	AND insight_date = CURRENT_DATE
 	ORDER BY impact_rub * confidence DESC
 	LIMIT 10
 	""")
