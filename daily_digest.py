@@ -104,13 +104,14 @@ def build_insights_block(cur, account_id: str) -> str:
 			entity_id,
 			impact_rub,
 			confidence,
+			priority,
 			title,
 			recommendation
 		FROM insights
 		WHERE status='new'
 		AND insight_date = CURRENT_DATE
 		AND account_id = %s
-		ORDER BY (impact_rub * COALESCE(confidence,1)) DESC NULLS LAST
+		ORDER BY priority DESC NULLS LAST
 		LIMIT 10
 		""",
 		(account_id,),
@@ -122,11 +123,11 @@ def build_insights_block(cur, account_id: str) -> str:
 	lines = []
 	lines.append("⚠ *Top инсайты (сегодня)*")
 	for r in rows:
-		_id, _type, _etype, entity_id, impact, conf, title, rec = r
+		_id, _type, _etype, entity_id, impact, conf, priority, title, rec = r
 		impact = float(impact or 0)
 		conf = float(conf or 1)
 		lines.append(f"• *{title}*")
-		lines.append(f"  `{entity_id}` | impact `{fmt_money(impact)} ₽` | conf `{fmt_num(conf,2)}`")
+		lines.append(f"  `{entity_id}` | impact `{fmt_money(impact)} ₽` | conf `{fmt_num(conf,2)}` | priority `{fmt_money(priority)}`")
 		lines.append(f"  {rec}")
 	return "\n".join(lines) + "\n"
 

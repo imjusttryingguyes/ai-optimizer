@@ -29,10 +29,16 @@ def insert_insight(
 	recommendation: str | None,
 	evidence: dict | None,
 	confidence: float = 1.0,
-	insight_date: str | None = None,	# 'YYYY-MM-DD' или None (= created_at::date)
+	insight_date: str | None = None,
 ):
 	conn = get_conn()
 	cur = conn.cursor()
+
+	impact_val = float(impact_rub) if impact_rub is not None else 0.0
+	conf_val = float(confidence) if confidence is not None else 0.0
+
+	# Пока simplest version
+	priority = impact_val * conf_val
 
 	cur.execute(
 		"""
@@ -44,6 +50,7 @@ def insert_insight(
 			severity,
 			impact_rub,
 			confidence,
+			priority,
 			title,
 			description,
 			recommendation,
@@ -51,12 +58,13 @@ def insert_insight(
 			insight_date,
 			updated_at
 		)
-		VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s::date, CURRENT_DATE), now())
+		VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s::date, CURRENT_DATE), now())
 		ON CONFLICT (account_id, type, entity_type, entity_id, insight_date)
 		DO UPDATE SET
 			severity = EXCLUDED.severity,
 			impact_rub = EXCLUDED.impact_rub,
 			confidence = EXCLUDED.confidence,
+			priority = EXCLUDED.priority,
 			title = EXCLUDED.title,
 			description = EXCLUDED.description,
 			recommendation = EXCLUDED.recommendation,
@@ -69,8 +77,9 @@ def insert_insight(
 			entity_type,
 			entity_id,
 			float(severity) if severity is not None else None,
-			float(impact_rub) if impact_rub is not None else None,
-			float(confidence) if confidence is not None else None,
+			impact_val,
+			conf_val,
+			priority,
 			title,
 			description,
 			recommendation,
