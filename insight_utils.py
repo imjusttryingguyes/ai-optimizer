@@ -1,5 +1,6 @@
 import os
 import json
+import hashlib
 
 import psycopg2
 from dotenv import load_dotenv
@@ -36,9 +37,22 @@ def insert_insight(
 
 	impact_val = float(impact_rub) if impact_rub is not None else 0.0
 	conf_val = float(confidence) if confidence is not None else 0.0
+	freshness_score = 1.0
 
-	# Пока simplest version
-	priority = impact_val * conf_val
+	evidence_json = json.dumps(evidence or {}, ensure_ascii=False, sort_keys=True)
+
+	fingerprint_source = json.dumps({
+		"type": type,
+		"entity_type": entity_type,
+		"entity_id": entity_id,
+		"impact_rub": round(impact_val, 2),
+		"confidence": round(conf_val, 4),
+		"evidence": json.loads(evidence_json),
+	}, ensure_ascii=False, sort_keys=True)
+
+	fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()
+
+	priority = impact_val * conf_val * freshness_score
 
 	cur.execute(
 		"""
@@ -51,24 +65,33 @@ def insert_insight(
 			impact_rub,
 			confidence,
 			priority,
+			fingerprint,
+			freshness_score,
 			title,
 			description,
 			recommendation,
 			evidence,
 			insight_date,
+			status,
 			updated_at
 		)
-		VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s::date, CURRENT_DATE), now())
+		VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s::date, CURRENT_DATE),'new',now())
 		ON CONFLICT (account_id, type, entity_type, entity_id, insight_date)
 		DO UPDATE SET
 			severity = EXCLUDED.severity,
 			impact_rub = EXCLUDED.impact_rub,
 			confidence = EXCLUDED.confidence,
 			priority = EXCLUDED.priority,
+			fingerprint = EXCLUDED.fingerprint,
+			freshness_score = EXCLUDED.freshness_score,
 			title = EXCLUDED.title,
 			description = EXCLUDED.description,
 			recommendation = EXCLUDED.recommendation,
 			evidence = EXCLUDED.evidence,
+			status = CASE
+				WHEN insights.fingerprint IS DISTINCT FROM EXCLUDED.fingerprint THEN 'new'
+				ELSE insights.status
+			END,
 			updated_at = now()
 		""",
 		(
@@ -80,10 +103,12 @@ def insert_insight(
 			impact_val,
 			conf_val,
 			priority,
+			fingerprint,
+			freshness_score,
 			title,
 			description,
 			recommendation,
-			json.dumps(evidence or {}, ensure_ascii=False),
+			evidence_json,
 			insight_date,
 		),
 	)
