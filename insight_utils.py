@@ -52,7 +52,16 @@ def insert_insight(
 
 	fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()
 
-	priority = impact_val * conf_val * freshness_score
+	WEIGHTS = {
+	"RSYA_WASTE": 1.0,
+	"CAMPAIGN_WASTE": 1.2,
+	"SEGMENT_BAD_CR": 0.8,
+	"BEST_PLACEMENT": 0.6,
+	}
+
+	business_weight = WEIGHTS.get(type, 1.0)
+
+	priority = impact_val * conf_val * business_weight
 
 	cur.execute(
 		"""
@@ -64,6 +73,7 @@ def insert_insight(
 			severity,
 			impact_rub,
 			confidence,
+			business_weight,
 			priority,
 			fingerprint,
 			freshness_score,
@@ -75,12 +85,13 @@ def insert_insight(
 			status,
 			updated_at
 		)
-		VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s::date, CURRENT_DATE),'new',now())
+		VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,COALESCE(%s::date, CURRENT_DATE),'new',now())
 		ON CONFLICT (account_id, type, entity_type, entity_id, insight_date)
 		DO UPDATE SET
 			severity = EXCLUDED.severity,
 			impact_rub = EXCLUDED.impact_rub,
 			confidence = EXCLUDED.confidence,
+			business_weight = EXCLUDED.business_weight,
 			priority = EXCLUDED.priority,
 			fingerprint = EXCLUDED.fingerprint,
 			freshness_score = EXCLUDED.freshness_score,
@@ -102,6 +113,7 @@ def insert_insight(
 			float(severity) if severity is not None else None,
 			impact_val,
 			conf_val,
+			business_weight,
 			priority,
 			fingerprint,
 			freshness_score,

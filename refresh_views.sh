@@ -11,6 +11,7 @@ REFRESH MATERIALIZED VIEW kpi_daily_campaign;
 REFRESH MATERIALIZED VIEW kpi_account_vs_plan;
 REFRESH MATERIALIZED VIEW kpi_segment_device_network;
 REFRESH MATERIALIZED VIEW kpi_rsy_placements_7d;
+REFRESH MATERIALIZED VIEW kpi_account_trends;
 SQL
 
 TS2="$(date '+%Y-%m-%d %H:%M:%S')"
