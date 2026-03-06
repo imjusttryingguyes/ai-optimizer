@@ -53,6 +53,7 @@ def build_kpi_block(cur, account_id: str) -> str:
 			account_id,
 			COALESCE(client_login, account_id) AS client_login,
 			COALESCE(data_days_week, 0) AS data_days_week,
+			COALESCE(data_days_30d, 0) AS data_days_30d,
 
 			COALESCE(cpa_week, 0) AS cpa_week,
 			COALESCE(cpa_plan, 0) AS cpa_plan,
@@ -72,10 +73,22 @@ def build_kpi_block(cur, account_id: str) -> str:
 	if not row:
 		return f"*KPI:* нет данных по {account_id}\n"
 
-	_, client_login, data_days_week, cpa_week, cpa_plan, cpa_30d, conv_day_week, conv_day_plan, conv_day_30d = row
+	(
+		_,
+		client_login,
+		data_days_week,
+		data_days_30d,
+		cpa_week,
+		cpa_plan,
+		cpa_30d,
+		conv_day_week,
+		conv_day_plan,
+		conv_day_30d,
+	) = row
 
 	lines = []
-	lines.append(f"*KPI ({client_login})*  _(данных дней: {int(data_days_week)})_")
+	lines.append(f"*KPI ({client_login})*")
+	lines.append(f"_данных дней: 7d={int(data_days_week)}, 30d={int(data_days_30d)}_")
 	lines.append(f"• CPA: week `{fmt_money(cpa_week)}` / plan `{fmt_money(cpa_plan)}` / 30d `{fmt_money(cpa_30d)}`")
 	lines.append(f"• Leads/day: week `{fmt_num(conv_day_week,1)}` / plan `{fmt_num(conv_day_plan,1)}` / 30d `{fmt_num(conv_day_30d,1)}`")
 	return "\n".join(lines) + "\n"
