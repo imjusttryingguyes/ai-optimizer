@@ -57,6 +57,7 @@ def insert_insight(
 	"CAMPAIGN_WASTE": 1.2,
 	"SEGMENT_BAD_CR": 0.8,
 	"BEST_PLACEMENT": 0.6,
+	"SEGMENT_COMBINATION_WASTE": 1.15,
 	}
 
 	business_weight = WEIGHTS.get(type, 1.0)

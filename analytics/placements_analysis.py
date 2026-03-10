@@ -4,7 +4,10 @@ print("RUNNING VERSION: DEBUG_20260305_1")
 import os
 import math
 import psycopg2
+import sys
 from dotenv import load_dotenv
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 load_dotenv()
 
