@@ -24,6 +24,9 @@ def main():
 	cur.execute("""
 		SELECT
 			t.account_id,
+			t.anchor_date,
+			t.data_days_last_3d,
+			t.data_days_prev_4d,
 			t.cpa_last_3d,
 			t.cpa_prev_4d,
 			t.conv_per_day_last_3d,
@@ -37,12 +40,35 @@ def main():
 
 	rows = cur.fetchall()
 
-	for account_id, cpa_last, cpa_prev, conv_last, conv_prev, cpa_plan in rows:
+	for (
+		account_id,
+		anchor_date,
+		data_days_last_3d,
+		data_days_prev_4d,
+		cpa_last,
+		cpa_prev,
+		conv_last,
+		conv_prev,
+		cpa_plan
+	) in rows:
 		cpa_last = float(cpa_last or 0)
 		cpa_prev = float(cpa_prev or 0)
 		conv_last = float(conv_last or 0)
 		conv_prev = float(conv_prev or 0)
 		cpa_plan = float(cpa_plan or 0)
+
+		data_days_last_3d = int(data_days_last_3d or 0)
+		data_days_prev_4d = int(data_days_prev_4d or 0)
+
+		# Защита от ложных трендов на неполных данных
+		if data_days_last_3d < 2 or data_days_prev_4d < 3:
+			print(
+				f"Skipping trends for {account_id}: "
+				f"anchor={anchor_date}, "
+				f"data_days_last_3d={data_days_last_3d}, "
+				f"data_days_prev_4d={data_days_prev_4d}"
+			)
+			continue
 
 		# 1. CPA worsened materially
 		if cpa_prev > 0 and cpa_last > cpa_prev * 1.3:
