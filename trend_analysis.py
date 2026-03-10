@@ -27,19 +27,22 @@ def main():
 			t.cpa_last_3d,
 			t.cpa_prev_4d,
 			t.conv_per_day_last_3d,
-			t.conv_per_day_prev_4d
+			t.conv_per_day_prev_4d,
+			COALESCE(at.cpa_plan, 0) AS cpa_plan
 		FROM kpi_account_trends t
+		LEFT JOIN account_targets at
+			ON at.account_id = t.account_id
+		WHERE at.is_active = true
 	""")
 
 	rows = cur.fetchall()
-	cur.close()
-	conn.close()
 
-	for account_id, cpa_last, cpa_prev, conv_last, conv_prev in rows:
+	for account_id, cpa_last, cpa_prev, conv_last, conv_prev, cpa_plan in rows:
 		cpa_last = float(cpa_last or 0)
 		cpa_prev = float(cpa_prev or 0)
 		conv_last = float(conv_last or 0)
 		conv_prev = float(conv_prev or 0)
+		cpa_plan = float(cpa_plan or 0)
 
 		# 1. CPA worsened materially
 		if cpa_prev > 0 and cpa_last > cpa_prev * 1.3:
@@ -67,7 +70,8 @@ def main():
 		# 2. Leads/day dropped materially
 		if conv_prev > 0 and conv_last < conv_prev * 0.7:
 			change_pct = ((conv_prev - conv_last) / conv_prev) * 100
-			impact = max(0.0, conv_prev - conv_last)
+			lost_leads_per_day = max(0.0, conv_prev - conv_last)
+			impact = lost_leads_per_day * cpa_plan
 
 			insert_insight(
 				account_id=account_id,
@@ -77,17 +81,26 @@ def main():
 				severity=75,
 				impact_rub=impact,
 				title=f"Leads/day dropped by {change_pct:.0f}%",
-				description=f"Leads/day last 3d = {conv_last:.1f}, previous 4d = {conv_prev:.1f}",
+				description=(
+					f"Leads/day last 3d = {conv_last:.1f}, previous 4d = {conv_prev:.1f}, "
+					f"lost = {lost_leads_per_day:.1f}/day, est. impact = {impact:.0f} ₽"
+				),
 				recommendation="Check recent budget, bid changes, segment drops and campaign delivery",
 				evidence={
 					"conv_per_day_last_3d": conv_last,
 					"conv_per_day_prev_4d": conv_prev,
+					"lost_leads_per_day": lost_leads_per_day,
+					"cpa_plan": cpa_plan,
+					"estimated_impact_rub": impact,
 					"change_pct": change_pct,
 				},
 				confidence=1.0,
 			)
 
 	print("Trend analysis complete.")
+
+	cur.close()
+	conn.close()
 
 
 if __name__ == "__main__":
