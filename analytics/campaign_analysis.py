@@ -1,6 +1,9 @@
 import os
 import psycopg2
+import sys
 from dotenv import load_dotenv
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 load_dotenv()
 
