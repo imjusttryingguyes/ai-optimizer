@@ -53,11 +53,15 @@ def insert_insight(
 	fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()
 
 	WEIGHTS = {
-	"RSYA_WASTE": 1.0,
-	"CAMPAIGN_WASTE": 1.2,
-	"SEGMENT_BAD_CR": 0.8,
-	"BEST_PLACEMENT": 0.6,
+	"RSYA_WASTE": 1.2,
+	"CAMPAIGN_WASTE": 1.1,
+	"SEGMENT_BAD_CR": 1.0,
+	"BEST_PLACEMENT": 0.7,
 	"SEGMENT_COMBINATION_WASTE": 1.15,
+	"SEGMENT_COMBINATION_CPA_BAD": 1.1,
+	"SEGMENT_COMBINATION_WINNER": 0.9,
+	"SEGMENT_COMBINATION_TREND_BAD": 1.2,
+	"SEGMENT_COMBINATION_TREND_GOOD": 0.95,
 	}
 
 	business_weight = WEIGHTS.get(type, 1.0)
