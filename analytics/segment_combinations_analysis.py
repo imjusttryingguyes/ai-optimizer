@@ -31,6 +31,14 @@ def get_conn():
 		password=os.getenv("DB_PASSWORD"),
 	)
 
+def has_unknown_values(*values):
+	for value in values:
+		if value is None:
+			return True
+		if str(value).upper() == "UNKNOWN":
+			return True
+	return False
+
 
 def main():
 	conn = get_conn()
@@ -89,6 +97,9 @@ def main():
 		conversions = float(conversions or 0)
 		segment_cpa = float(segment_cpa) if segment_cpa is not None else None
 		account_cpa = float(account_cpa) if account_cpa is not None else None
+
+		if has_unknown_values(ad_network_type, device, age, gender):
+			continue
 
 		if spend_rub < MIN_SPEND_RUB:
 			continue

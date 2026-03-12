@@ -30,6 +30,14 @@ def get_conn():
 		password=os.getenv("DB_PASSWORD"),
 	)
 
+def has_unknown_values(*values):
+	for value in values:
+		if value is None:
+			return True
+		if str(value).upper() == "UNKNOWN":
+			return True
+	return False
+
 
 def main():
 	conn = get_conn()
@@ -109,6 +117,9 @@ def main():
 		conv_per_day_baseline_23d = float(conv_per_day_baseline_23d or 0)
 		
 		segment_key = f"{ad_network_type}|{device}|{age}|{gender}"
+		
+		if has_unknown_values(ad_network_type, device, age, gender):
+			continue
 
 		if data_days_recent_7d < MIN_RECENT_DATA_DAYS:
 			print(f"SKIP recent_days {account_id} {segment_key}")
