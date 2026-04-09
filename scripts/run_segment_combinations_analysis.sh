@@ -1,5 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-cd /opt/ai-optimizer || exit 1
-source venv/bin/activate
-python analytics/segment_combinations_analysis.py
+/opt/ai-optimizer/venv/bin/python /opt/ai-optimizer/analytics/segment_combinations_analysis.py

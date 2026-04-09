@@ -1,117 +1,157 @@
-import os
-import psycopg2
-import sys
-from dotenv import load_dotenv
+"""
+Campaign-level performance analysis.
+Identifies worst, best, and wasting campaigns relative to account average.
+"""
 
+import sys
+import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-load_dotenv()
+from .analyzer_base import Analyzer
 
 
-def get_conn():
-	return psycopg2.connect(
-		host=os.getenv("DB_HOST"),
-		port=os.getenv("DB_PORT"),
-		dbname=os.getenv("DB_NAME"),
-		user=os.getenv("DB_USER"),
-		password=os.getenv("DB_PASSWORD"),
-	)
+class CampaignAnalyzer(Analyzer):
+    """Analyze campaigns within each account for waste and winners."""
 
+    def __init__(self, config: dict = None):
+        super().__init__(config)
+        self.thresholds = {
+            'min_cost': 1000.0,
+            'waste_cost_threshold': 5000.0,
+            'worst_multiplier': 1.5,
+            'best_multiplier': 0.7,
+        }
+        self.thresholds.update(self.config.get('thresholds', {}))
 
-def fmt_money(x):
-	try:
-		return f"{float(x):,.0f}".replace(",", " ")
-	except Exception:
-		return str(x)
+    def analyze(self) -> list:
+        """Run campaign analysis."""
+        min_cost = self.thresholds['min_cost']
+        waste_cost = self.thresholds['waste_cost_threshold']
+        worst_mult = self.thresholds['worst_multiplier']
+        best_mult = self.thresholds['best_multiplier']
 
+        query = """
+            SELECT
+                account_id,
+                campaign_id,
+                spend_rub,
+                conversions,
+                cpa,
+                AVG(cpa) OVER (PARTITION BY account_id) as cpa_account
+            FROM kpi_campaign_vs_account
+            WHERE spend_rub >= %s
+            ORDER BY account_id, spend_rub DESC
+        """
+        
+        rows = self.execute_query(query, (min_cost,))
+        
+        current_account = None
+        worst = []
+        best = []
+        waste = []
 
-def fmt_num(x):
-	try:
-		return f"{float(x):,.2f}".replace(",", " ")
-	except Exception:
-		return str(x)
+        for r in rows:
+            account_id, campaign_id, spend_rub, conv, cpa_c, cpa_a = r
+
+            if account_id != current_account:
+                if current_account is not None:
+                    self._save_campaign_insights(current_account, worst, best, waste)
+                current_account = account_id
+                worst, best, waste = [], [], []
+
+            spend_rub = float(spend_rub or 0)
+            conv = float(conv or 0)
+            cpa_a = float(cpa_a) if cpa_a is not None else None
+            cpa_c = float(cpa_c) if cpa_c is not None else None
+
+            # Waste: spend but no conversions
+            if conv == 0 and spend_rub >= waste_cost:
+                waste.append((campaign_id, spend_rub))
+                continue
+
+            if cpa_a is None or cpa_c is None:
+                continue
+
+            # Worst/best relative to account CPA
+            if cpa_c > cpa_a * worst_mult:
+                worst.append((campaign_id, spend_rub, conv, cpa_c, cpa_a))
+            elif cpa_c < cpa_a * best_mult:
+                best.append((campaign_id, spend_rub, conv, cpa_c, cpa_a))
+
+        # Save last account's insights
+        if current_account is not None:
+            self._save_campaign_insights(current_account, worst, best, waste)
+
+        return self.insights
+
+    def _save_campaign_insights(self, account_id, worst, best, waste):
+        """Save campaign insights for single account."""
+        # Worst campaigns
+        for cid, spend_rub, conv, cpa_c, cpa_a in worst[:10]:
+            self.add_insight(
+                account_id=str(account_id),
+                type="CAMPAIGN_CPA_BAD",
+                entity_type="campaign",
+                entity_id=str(cid),
+                impact_rub=spend_rub,
+                title=f"Кампания {cid}: высокая CPA ({self.fmt_num(cpa_c)} vs {self.fmt_num(cpa_a)})",
+                description=f"CPA этой кампании {self.fmt_num(cpa_c)} на {self.thresholds['worst_multiplier']}x выше средней по аккаунту",
+                recommendation=f"Пересмотреть ставки и целевые группы в кампании {cid}",
+                evidence={
+                    'campaign_cpa': float(cpa_c),
+                    'account_cpa': float(cpa_a),
+                    'conversions': float(conv),
+                    'spend_rub': float(spend_rub),
+                },
+                confidence=0.9,
+            )
+
+        # Waste campaigns (spend but no conversions)
+        for cid, spend_rub in waste[:10]:
+            self.add_insight(
+                account_id=str(account_id),
+                type="CAMPAIGN_WASTE",
+                entity_type="campaign",
+                entity_id=str(cid),
+                impact_rub=spend_rub,
+                severity=min(spend_rub / 10000, 1.0),
+                title=f"Кампания {cid}: расход без конверсий",
+                description=f"Потрачено {self.fmt_money(spend_rub)} руб., но 0 конверсий",
+                recommendation=f"Остановить или пересмотреть кампанию {cid}",
+                evidence={
+                    'spend_rub': float(spend_rub),
+                    'conversions': 0,
+                },
+                confidence=0.95,
+            )
+
+        # Best campaigns
+        for cid, spend_rub, conv, cpa_c, cpa_a in best[:5]:
+            self.add_insight(
+                account_id=str(account_id),
+                type="CAMPAIGN_WINNER",
+                entity_type="campaign",
+                entity_id=str(cid),
+                impact_rub=spend_rub,
+                severity=0.2,
+                title=f"Кампания {cid}: отличная CPA ({self.fmt_num(cpa_c)})",
+                description=f"CPA этой кампании {self.fmt_num(cpa_c)} на {1/self.thresholds['best_multiplier']:.1f}x ниже средней",
+                recommendation=f"Увеличить бюджет кампании {cid}",
+                evidence={
+                    'campaign_cpa': float(cpa_c),
+                    'account_cpa': float(cpa_a),
+                    'conversions': float(conv),
+                    'spend_rub': float(spend_rub),
+                },
+                confidence=0.85,
+            )
 
 
 def main():
-	# Пороги (потом вынесем в таблицу настроек)
-	min_cost_for_analysis = 1000.0
-	waste_cost_threshold = 5000.0
-	worst_multiplier = 1.5
-	best_multiplier = 0.7
-
-	conn = get_conn()
-	cur = conn.cursor()
-
-	cur.execute("""
-		SELECT
-			account_id,
-			campaign_id,
-			cost,
-			conversions,
-			cpa_campaign,
-			cpa_account
-		FROM kpi_campaign_vs_account
-		WHERE cost >= %s
-		ORDER BY cost DESC
-	""", (min_cost_for_analysis,))
-
-	rows = cur.fetchall()
-
-	worst = []
-	best = []
-	waste = []
-
-	for r in rows:
-		account_id, campaign_id, cost, conv, cpa_c, cpa_a = r
-
-		cost = float(cost or 0)
-		conv = float(conv or 0)
-		cpa_a = float(cpa_a) if cpa_a is not None else None
-		cpa_c = float(cpa_c) if cpa_c is not None else None
-
-		# Слив: есть расход, нет конверсий
-		if conv == 0 and cost >= waste_cost_threshold:
-			waste.append((campaign_id, cost))
-			continue
-
-		if cpa_a is None or cpa_c is None:
-			continue
-
-		# Плохие/хорошие относительно CPA аккаунта
-		if cpa_c > cpa_a * worst_multiplier:
-			worst.append((campaign_id, cost, conv, cpa_c, cpa_a))
-		elif cpa_c < cpa_a * best_multiplier:
-			best.append((campaign_id, cost, conv, cpa_c, cpa_a))
-
-	print("===== CAMPAIGN ANALYSIS (7d window, or available days) =====\n")
-
-	if worst:
-		print("⚠ WORST CAMPAIGNS (CPA > account * 1.5)")
-		for cid, cost, conv, cpa_c, cpa_a in worst[:10]:
-			print(f"- {cid}: spend {fmt_money(cost)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_c)} (acct {fmt_num(cpa_a)})")
-		print("")
-	else:
-		print("✅ No WORST campaigns by threshold\n")
-
-	if waste:
-		print("💸 SPEND WITHOUT CONVERSIONS (conv=0 and spend>=5000)")
-		for cid, cost in waste[:10]:
-			print(f"- {cid}: spend {fmt_money(cost)}")
-		print("")
-	else:
-		print("✅ No big spend-without-conv cases\n")
-
-	if best:
-		print("🚀 BEST CAMPAIGNS (CPA < account * 0.7)")
-		for cid, cost, conv, cpa_c, cpa_a in best[:10]:
-			print(f"- {cid}: spend {fmt_money(cost)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_c)} (acct {fmt_num(cpa_a)})")
-		print("")
-	else:
-		print("ℹ No BEST campaigns by threshold\n")
-
-	cur.close()
-	conn.close()
+    """Run campaign analysis."""
+    analyzer = CampaignAnalyzer()
+    analyzer.run()
 
 
 if __name__ == "__main__":
-	main()
+    main()

@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}AI Optimizer Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+	<div class="col-md-12">
+		<h1 class="mb-4"><i class="bi bi-speedometer2"></i> Дашборд</h1>
+		
+		<div class="btn-group mb-3" role="group">
+			<a href="?days=7" class="btn btn-outline-primary {% if days == 7 %}active{% endif %}">7 дней</a>
+			<a href="?days=14" class="btn btn-outline-primary {% if days == 14 %}active{% endif %}">14 дней</a>
+			<a href="?days=30" class="btn btn-outline-primary {% if days == 30 %}active{% endif %}">30 дней</a>
+		</div>
+	</div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+	<div class="col-md-3">
+		<div class="card stats-card">
+			<div class="card-body">
+				<div class="stat-value">{{ stats.total_insights }}</div>
+				<div class="stat-label">Всего инсайтов</div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-3">
+		<div class="card stats-card">
+			<div class="card-body">
+				<div class="stat-value">{{ stats.accounts_affected }}</div>
+				<div class="stat-label">Затронутых аккаунтов</div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-3">
+		<div class="card stats-card">
+			<div class="card-body">
+				<div class="stat-value">{{ stats.total_impact|thousands }} ₽</div>
+				<div class="stat-label">Сумма воздействия</div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-3">
+		<div class="card stats-card">
+			<div class="card-body">
+				<div class="stat-value">{{ stats.avg_severity|decimal1 }}</div>
+				<div class="stat-label">Средний уровень серьезности</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="row mb-4">
+	<div class="col-md-6">
+		<div class="card">
+			<div class="card-header">
+				<h5 class="mb-0">🎯 Инсайты по типам</h5>
+			</div>
+			<div class="card-body">
+				<canvas id="insightTypesChart"></canvas>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-6">
+		<div class="card">
+			<div class="card-header">
+				<h5 class="mb-0">⚠️ Распределение по серьезности</h5>
+			</div>
+			<div class="card-body">
+				<canvas id="severityChart"></canvas>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="row mb-4">
+	<div class="col-md-12">
+		<div class="card">
+			<div class="card-header">
+				<h5 class="mb-0">📈 Тренд инсайтов (последние 30 дней)</h5>
+			</div>
+			<div class="card-body">
+				<canvas id="timelineChart"></canvas>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="row mb-4">
+	<div class="col-md-12">
+		<div class="card">
+			<div class="card-header">
+				<h5 class="mb-0">👑 Топ аккаунты по воздействию</h5>
+			</div>
+			<div class="card-body">
+				<canvas id="topAccountsChart"></canvas>
+			</div>
+		</div>
+	</div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Prepare data for charts
+const insightTypes = {{ insights_by_type | tojson }};
+const severityDist = {{ severity_dist | tojson }};
+
+// Insight Types Chart
+const ctxTypes = document.getElementById('insightTypesChart').getContext('2d');
+new Chart(ctxTypes, {
+	type: 'doughnut',
+	data: {
+		labels: insightTypes.map(item => item.type),
+		datasets: [{
+			data: insightTypes.map(item => item.count),
+			backgroundColor: [
+				'#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+				'#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+			]
+		}]
+	},
+	options: {
+		responsive: true,
+		plugins: {
+			legend: {
+				position: 'bottom',
+			}
+		}
+	}
+});
+
+// Severity Distribution Chart
+const ctxSeverity = document.getElementById('severityChart').getContext('2d');
+const severityColors = {
+	'Critical': '#DC3545',
+	'High': '#FFC107',
+	'Medium': '#17A2B8',
+	'Low': '#28A745'
+};
+new Chart(ctxSeverity, {
+	type: 'bar',
+	data: {
+		labels: severityDist.map(item => item.level),
+		datasets: [{
+			label: 'Количество инсайтов',
+			data: severityDist.map(item => item.count),
+			backgroundColor: severityDist.map(item => severityColors[item.level] || '#999')
+		}]
+	},
+	options: {
+		responsive: true,
+		plugins: {
+			legend: { display: false }
+		},
+		scales: {
+			y: { beginAtZero: true }
+		}
+	}
+});
+
+// Timeline Chart
+fetch('/api/insights-timeline?days=30')
+	.then(r => r.json())
+	.then(data => {
+		const ctxTimeline = document.getElementById('timelineChart').getContext('2d');
+		new Chart(ctxTimeline, {
+			type: 'line',
+			data: {
+				labels: data.dates,
+				datasets: [
+					{
+						label: 'Количество инсайтов',
+						data: data.counts,
+						borderColor: '#36A2EB',
+						backgroundColor: 'rgba(54, 162, 235, 0.1)',
+						yAxisID: 'y'
+					},
+					{
+						label: 'Сумма воздействия (₽)',
+						data: data.impacts,
+						borderColor: '#FF6384',
+						backgroundColor: 'rgba(255, 99, 132, 0.1)',
+						yAxisID: 'y1'
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				scales: {
+					y: {
+						type: 'linear',
+						display: true,
+						position: 'left',
+						title: { display: true, text: 'Количество' }
+					},
+					y1: {
+						type: 'linear',
+						display: true,
+						position: 'right',
+						title: { display: true, text: 'Рубли' },
+						grid: { drawOnChartArea: false }
+					}
+				}
+			}
+		});
+	});
+
+// Top Accounts Chart
+fetch('/api/top-accounts?days=7')
+	.then(r => r.json())
+	.then(data => {
+		const ctxAccounts = document.getElementById('topAccountsChart').getContext('2d');
+		new Chart(ctxAccounts, {
+			type: 'bar',
+			data: {
+				labels: data.accounts,
+				datasets: [{
+					label: 'Сумма воздействия (₽)',
+					data: data.impacts,
+					backgroundColor: '#36A2EB'
+				}]
+			},
+			options: {
+				indexAxis: 'y',
+				responsive: true,
+				scales: {
+					x: { beginAtZero: true }
+				}
+			}
+		});
+	});
+</script>
+{% endblock %}

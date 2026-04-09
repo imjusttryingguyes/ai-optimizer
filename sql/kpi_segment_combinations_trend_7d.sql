@@ -6,10 +6,16 @@ WITH daily AS (
 		date,
 		account_id,
 		client_login,
+		campaign_id,
+		adgroup_id,
+		criterion_id,
 		ad_network_type,
 		device,
+		location_of_presence_name,
+		targeting_location_name,
 		age,
 		gender,
+		weekday,
 		SUM(impressions) AS impressions,
 		SUM(clicks) AS clicks,
 		SUM(spend_rub) AS spend_rub,
@@ -19,19 +25,31 @@ WITH daily AS (
 		date,
 		account_id,
 		client_login,
+		campaign_id,
+		adgroup_id,
+		criterion_id,
 		ad_network_type,
 		device,
+		location_of_presence_name,
+		targeting_location_name,
 		age,
-		gender
+		gender,
+		weekday
 ),
 recent AS (
 	SELECT
 		account_id,
 		client_login,
+		campaign_id,
+		adgroup_id,
+		criterion_id,
 		ad_network_type,
 		device,
+		location_of_presence_name,
+		targeting_location_name,
 		age,
 		gender,
+		weekday,
 		COUNT(DISTINCT date) AS data_days_recent_7d,
 		SUM(impressions) AS impressions_recent_7d,
 		SUM(clicks) AS clicks_recent_7d,
@@ -42,19 +60,31 @@ recent AS (
 	GROUP BY
 		account_id,
 		client_login,
+		campaign_id,
+		adgroup_id,
+		criterion_id,
 		ad_network_type,
 		device,
+		location_of_presence_name,
+		targeting_location_name,
 		age,
-		gender
+		gender,
+		weekday
 ),
 baseline AS (
 	SELECT
 		account_id,
 		client_login,
+		campaign_id,
+		adgroup_id,
+		criterion_id,
 		ad_network_type,
 		device,
+		location_of_presence_name,
+		targeting_location_name,
 		age,
 		gender,
+		weekday,
 		COUNT(DISTINCT date) AS data_days_baseline_23d,
 		SUM(impressions) AS impressions_baseline_23d,
 		SUM(clicks) AS clicks_baseline_23d,
@@ -66,18 +96,30 @@ baseline AS (
 	GROUP BY
 		account_id,
 		client_login,
+		campaign_id,
+		adgroup_id,
+		criterion_id,
 		ad_network_type,
 		device,
+		location_of_presence_name,
+		targeting_location_name,
 		age,
-		gender
+		gender,
+		weekday
 )
 SELECT
 	r.account_id,
 	r.client_login,
+	r.campaign_id,
+	r.adgroup_id,
+	r.criterion_id,
 	r.ad_network_type,
 	r.device,
+	r.location_of_presence_name,
+	r.targeting_location_name,
 	r.age,
 	r.gender,
+	r.weekday,
 
 	r.data_days_recent_7d,
 	b.data_days_baseline_23d,
@@ -132,7 +174,13 @@ FROM recent r
 JOIN baseline b
 	ON r.account_id = b.account_id
 	AND r.client_login = b.client_login
+	AND r.campaign_id = b.campaign_id
+	AND r.adgroup_id = b.adgroup_id
+	AND r.criterion_id = b.criterion_id
 	AND r.ad_network_type = b.ad_network_type
 	AND r.device = b.device
+	AND r.location_of_presence_name = b.location_of_presence_name
+	AND r.targeting_location_name = b.targeting_location_name
 	AND r.age = b.age
-	AND r.gender = b.gender;
+	AND r.gender = b.gender
+	AND r.weekday = b.weekday;

@@ -1,29 +1,51 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 echo "=== TESTING CRON JOBS ==="
+echo ""
 
-cd /opt/ai-optimizer
-source venv/bin/activate
-
-echo "1. refresh views"
-bash scripts/refresh_views.sh
+echo "1. refresh materialized views"
+bash /opt/ai-optimizer/scripts/refresh_views.sh
+echo ""
 
 echo "2. placements analysis"
-bash scripts/run_placements_analysis.sh
+bash /opt/ai-optimizer/scripts/run_placements_analysis.sh
+echo ""
 
 echo "3. campaign analysis"
-bash scripts/run_campaign_analysis.sh
+bash /opt/ai-optimizer/scripts/run_campaign_analysis.sh
+echo ""
 
 echo "4. segment analysis"
-bash scripts/run_segment_analysis.sh
+bash /opt/ai-optimizer/scripts/run_segment_analysis.sh
+echo ""
 
-echo "5. trend analysis"
-bash scripts/run_trend_analysis.sh
+echo "5. segment combinations analysis"
+bash /opt/ai-optimizer/scripts/run_segment_combinations_analysis.sh
+echo ""
 
-echo "6. segment combinations analysis"
-bash scripts/run_segment_combinations_analysis.sh
+echo "6. segment ladder analysis"
+bash /opt/ai-optimizer/scripts/run_segment_ladder_analysis.sh
+echo ""
 
-echo "7. daily digest"
-bash scripts/run_daily_digest.sh
+echo "7. segment combinations trend analysis"
+bash /opt/ai-optimizer/scripts/run_segment_combinations_trend_analysis.sh
+echo ""
+
+echo "8. segment ladder trend analysis"
+bash /opt/ai-optimizer/scripts/run_segment_ladder_trend_analysis.sh
+echo ""
+
+echo "9. trend analysis"
+bash /opt/ai-optimizer/scripts/run_trend_analysis.sh
+echo ""
+
+echo "10. kpi alert"
+bash /opt/ai-optimizer/scripts/run_kpi_alert.sh
+echo ""
+
+echo "11. daily digest"
+bash /opt/ai-optimizer/scripts/run_daily_digest.sh
+echo ""
 
 echo "=== ALL JOBS FINISHED ==="

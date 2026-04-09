@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /opt/ai-optimizer
-source venv/bin/activate
-python telegram/daily_digest.py
+/opt/ai-optimizer/venv/bin/python /opt/ai-optimizer/telegram/daily_digest.py

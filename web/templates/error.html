@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Ошибка - AI Optimizer{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+	<div class="row justify-content-center">
+		<div class="col-md-6">
+			<div class="card border-danger">
+				<div class="card-header bg-danger text-white">
+					<h5 class="mb-0">❌ Ошибка подключения</h5>
+				</div>
+				<div class="card-body">
+					<p class="mb-3">
+						Не удалось подключиться к базе данных. Убедитесь, что:
+					</p>
+					<ul>
+						<li>PostgreSQL запущена и доступна</li>
+						<li>Правильно указаны учетные данные в <code>.env</code></li>
+						<li>Хост и порт верны</li>
+					</ul>
+					<hr>
+					<h6>Детали ошибки:</h6>
+					<pre class="bg-light p-3 rounded" style="font-size: 0.85rem; max-height: 300px; overflow-y: auto;">{{ error }}</pre>
+					
+					<div class="mt-4">
+						<a href="/" class="btn btn-primary">Вернуться на главную</a>
+						<a href="/insights" class="btn btn-secondary">Инсайты</a>
+					</div>
+				</div>
+			</div>
+			
+			<div class="alert alert-info mt-3">
+				<strong>💡 Совет:</strong> Запустите локальную БД командой:<br>
+				<code>docker compose up -d postgres</code>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
