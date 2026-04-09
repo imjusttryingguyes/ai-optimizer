@@ -82,6 +82,7 @@ def get_insights_by_period(days=7, account_id=None, severity_min=0):
 		where_clauses.append(f"account_id = '{account_id}'")
 	
 	where_sql = " AND ".join(where_clauses)
+	filter_meaningless = "AND NOT (type = 'SEGMENT_LADDER_WINNER' AND LENGTH(COALESCE(description, '')) < 90)"
 	
 	cur.execute(f"""
 		SELECT 
@@ -89,6 +90,7 @@ def get_insights_by_period(days=7, account_id=None, severity_min=0):
 			severity, impact_rub, title, description, recommendation, created_at
 		FROM insights
 		WHERE {where_sql}
+		{filter_meaningless}
 		ORDER BY severity DESC, impact_rub DESC, created_at DESC
 	""")
 	
@@ -104,45 +106,50 @@ def get_trend_data(account_id=None, severity_min=0):
 	
 	account_filter = f"AND account_id = '{account_id}'" if account_id else ""
 	
-	# Get 7-day impact per entity
+	# Get 7-day insights (by type)
 	cur.execute(f"""
 		SELECT 
-			COALESCE(account_id, '') as entity,
-			COALESCE(entity_type, '') as etype,
-			COALESCE(entity_id, '') as eid,
-			SUM(impact_rub) as impact_7d,
-			AVG(severity) as avg_severity_7d
+			type, COUNT(*) as count_7d, SUM(impact_rub) as impact_7d, AVG(severity) as severity_7d
 		FROM insights
 		WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
 			AND severity >= {severity_min}
 			{account_filter}
-		GROUP BY account_id, entity_type, entity_id
+			AND NOT (type = 'SEGMENT_LADDER_WINNER' AND LENGTH(COALESCE(description, '')) < 90)
+		GROUP BY type
 	""")
-	data_7d = {(r[0], r[1], r[2]): (r[3] or 0, r[4] or 0) for r in cur.fetchall()}
+	data_7d = {row[0]: (row[1], row[2] or 0, row[3] or 0) for row in cur.fetchall()}
 	
-	# Get 30-day impact per entity
+	# Get 30-day insights (by type)
 	cur.execute(f"""
 		SELECT 
-			COALESCE(account_id, '') as entity,
-			COALESCE(entity_type, '') as etype,
-			COALESCE(entity_id, '') as eid,
-			SUM(impact_rub) as impact_30d,
-			AVG(severity) as avg_severity_30d,
-			id, type, title, description, recommendation, created_at
+			type, COUNT(*) as count_30d, SUM(impact_rub) as impact_30d, AVG(severity) as severity_30d,
+			MAX(title) as sample_title, MAX(description) as sample_desc
 		FROM insights
 		WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
 			AND severity >= {severity_min}
 			{account_filter}
-		GROUP BY account_id, entity_type, entity_id, id, type, title, description, recommendation, created_at
+			AND NOT (type = 'SEGMENT_LADDER_WINNER' AND LENGTH(COALESCE(description, '')) < 90)
+		GROUP BY type
 	""")
 	
 	trends = []
 	for row in cur.fetchall():
-		entity = (row[0], row[1], row[2])
-		impact_30d = row[3] or 0
-		avg_severity_30d = row[4] or 0
+		insight_type = row[0]
+		count_30d = row[1]
+		impact_30d = row[2] or 0
+		severity_30d = row[3] or 0
+		sample_title = row[4] or insight_type
+		sample_desc = row[5] or ""
 		
-		impact_7d, avg_severity_7d = data_7d.get(entity, (0, 0))
+		count_7d, impact_7d, severity_7d = data_7d.get(insight_type, (0, 0, 0))
+		
+		# Skip if no activity in either period
+		if impact_7d == 0 and impact_30d == 0:
+			continue
+		
+		# Skip if identical (0% change)
+		if impact_7d == impact_30d and impact_7d != 0:
+			continue
 		
 		# Determine if improving or declining
 		if impact_7d > impact_30d:
@@ -150,21 +157,26 @@ def get_trend_data(account_id=None, severity_min=0):
 		else:
 			trend = 'decline'
 		
+		# Calculate percentage change
+		if impact_30d > 0:
+			change_pct = round((impact_7d - impact_30d) / impact_30d * 100, 1)
+		elif impact_7d > 0:
+			change_pct = 100.0
+		else:
+			change_pct = 0
+		
 		trends.append({
-			'entity': row[0],
-			'entity_type': row[1],
-			'entity_id': row[2],
+			'type': insight_type,
 			'trend': trend,
+			'count_7d': count_7d,
+			'count_30d': count_30d,
 			'impact_7d': impact_7d,
 			'impact_30d': impact_30d,
-			'severity_7d': avg_severity_7d,
-			'severity_30d': avg_severity_30d,
-			'id': row[5],
-			'type': row[6],
-			'title': row[7],
-			'description': row[8],
-			'recommendation': row[9],
-			'created_at': row[10]
+			'severity_7d': severity_7d,
+			'severity_30d': severity_30d,
+			'change_percent': change_pct,
+			'sample_title': sample_title,
+			'sample_desc': sample_desc[:100] if sample_desc else ""
 		})
 	
 	cur.close()
@@ -390,22 +402,17 @@ def insights():
 				trend_data = [t for t in trend_data if t['trend'] == 'decline']
 			
 			insights_list = [{
-				'id': t['id'],
-				'account_id': t['entity'],
 				'type': t['type'],
-				'entity_type': t['entity_type'],
-				'entity_id': t['entity_id'],
 				'severity': t['severity_7d'],
 				'impact_rub': float(t['impact_7d']),
-				'title': t['title'],
-				'description': t['description'],
-				'recommendation': t['recommendation'],
-				'created_at': t['created_at'].isoformat() if t['created_at'] else None,
-				'date_formatted': t['created_at'].strftime('%Y-%m-%d %H:%M') if t['created_at'] else 'N/A',
+				'title': t['sample_title'],
+				'description': t['sample_desc'],
 				'trend': t['trend'],
 				'impact_7d': float(t['impact_7d']),
 				'impact_30d': float(t['impact_30d']),
-				'change_percent': round(((t['impact_7d'] - t['impact_30d']) / t['impact_30d'] * 100) if t['impact_30d'] > 0 else 0, 1)
+				'count_7d': t['count_7d'],
+				'count_30d': t['count_30d'],
+				'change_percent': t['change_percent']
 			} for t in trend_data]
 		else:
 			days = 7 if mode == '7days' else 30

@@ -97,44 +97,40 @@
 		<table class="table table-hover mb-0">
 			<thead class="table-dark">
 				<tr>
-					<th>Дата</th>
-					<th>Серьезность</th>
-					<th>Аккаунт</th>
 					{% if selected_mode == 'trends' %}
+						<th>Тип инсайта</th>
 						<th>Тренд</th>
-						<th>Воздействие 7д (₽)</th>
-						<th>Воздействие 30д (₽)</th>
-						<th>Изменение (%)</th>
+						<th style="width: 15%">Кол-во (7д / 30д)</th>
+						<th class="text-end">Воздействие 7д (₽)</th>
+						<th class="text-end">Воздействие 30д (₽)</th>
+						<th class="text-end">Изменение (%)</th>
 					{% else %}
+						<th>Дата</th>
+						<th>Серьезность</th>
+						<th>Аккаунт</th>
 						<th>Название</th>
-						<th>Воздействие (₽)</th>
+						<th class="text-end">Воздействие (₽)</th>
 					{% endif %}
 				</tr>
 			</thead>
 			<tbody>
 				{% if insights %}
 					{% for insight in insights %}
-					<tr class="insight-row" data-id="{{ insight.id }}" onclick="showInsightModal({{ insight | tojson }})">
-						<td>{{ insight.date_formatted }}</td>
-						<td>
-							{% if insight.severity >= 80 %}
-								<span class="badge bg-danger">🔥 {{ insight.severity }}</span>
-							{% elif insight.severity >= 60 %}
-								<span class="badge bg-warning text-dark">🔴 {{ insight.severity }}</span>
-							{% elif insight.severity >= 40 %}
-								<span class="badge bg-info">⚠️ {{ insight.severity }}</span>
-							{% else %}
-								<span class="badge bg-secondary">ℹ️ {{ insight.severity }}</span>
-							{% endif %}
-						</td>
-						<td><strong>{{ insight.account_id }}</strong></td>
+					<tr class="insight-row" onclick="showInsightModal({{ insight | tojson }})">
 						{% if selected_mode == 'trends' %}
+							<td>
+								<code>{{ insight.type }}</code>
+								<div class="small text-muted">{{ insight.title }}</div>
+							</td>
 							<td>
 								{% if insight.trend == 'improvement' %}
 									<span class="badge bg-success">📈 Улучшение</span>
 								{% else %}
 									<span class="badge bg-danger">📉 Ухудшение</span>
 								{% endif %}
+							</td>
+							<td>
+								<strong>{{ insight.count_7d }}</strong> / <strong>{{ insight.count_30d }}</strong>
 							</td>
 							<td class="text-end"><strong>{{ insight.impact_7d|currency }}</strong></td>
 							<td class="text-end"><strong>{{ insight.impact_30d|currency }}</strong></td>
@@ -144,6 +140,19 @@
 								</strong>
 							</td>
 						{% else %}
+							<td>{{ insight.date_formatted }}</td>
+							<td>
+								{% if insight.severity >= 80 %}
+									<span class="badge bg-danger">🔥 {{ insight.severity }}</span>
+								{% elif insight.severity >= 60 %}
+									<span class="badge bg-warning text-dark">🔴 {{ insight.severity }}</span>
+								{% elif insight.severity >= 40 %}
+									<span class="badge bg-info">⚠️ {{ insight.severity }}</span>
+								{% else %}
+									<span class="badge bg-secondary">ℹ️ {{ insight.severity }}</span>
+								{% endif %}
+							</td>
+							<td><strong>{{ insight.account_id }}</strong></td>
 							<td>{{ insight.title }}</td>
 							<td class="text-end"><strong>{{ insight.impact_rub|currency }}</strong></td>
 						{% endif %}
@@ -151,7 +160,7 @@
 					{% endfor %}
 				{% else %}
 					<tr>
-						<td colspan="{% if selected_mode == 'trends' %}7{% else %}6{% endif %}" class="text-center text-muted py-4">
+						<td colspan="{% if selected_mode == 'trends' %}6{% else %}5{% endif %}" class="text-center text-muted py-4">
 							<i class="bi bi-inbox"></i> Инсайты не найдены
 						</td>
 					</tr>
