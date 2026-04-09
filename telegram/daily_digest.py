@@ -19,6 +19,33 @@ def get_conn():
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
+MAX_RISKS = 5
+MAX_OPPORTUNITIES = 5
+MAX_CHANGES = 5
+
+RISK_TYPES = (
+	"ACCOUNT_CPA_TREND_BAD",
+	"ACCOUNT_LEADS_TREND_BAD",
+	"RSYA_WASTE",
+	"SEGMENT_COMBINATION_WASTE",
+	"SEGMENT_COMBINATION_CPA_BAD",
+	"SEGMENT_LADDER_WASTE",
+	"SEGMENT_LADDER_CPA_BAD",
+	"SEGMENT_LADDER_TREND_BAD",
+)
+
+OPPORTUNITY_TYPES = (
+	"SEGMENT_COMBINATION_WINNER",
+	"SEGMENT_LADDER_WINNER",
+)
+
+CHANGE_TYPES = (
+	"SEGMENT_COMBINATION_TREND_BAD",
+	"SEGMENT_COMBINATION_TREND_GOOD",
+	"SEGMENT_LADDER_TREND_BAD",
+	"SEGMENT_LADDER_TREND_GOOD",
+)
+
 
 def send_message(text: str):
 	url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -93,8 +120,7 @@ def build_kpi_block(cur, account_id: str) -> str:
 	lines.append(f"• Leads/day: week `{fmt_num(conv_day_week,1)}` / plan `{fmt_num(conv_day_plan,1)}` / 30d `{fmt_num(conv_day_30d,1)}`")
 	return "\n".join(lines) + "\n"
 
-
-def build_insights_block(cur, account_id: str) -> str:
+def fetch_insights_by_types(cur, account_id: str, insight_types: tuple[str, ...], limit: int):
 	cur.execute(
 		"""
 		SELECT
@@ -108,28 +134,58 @@ def build_insights_block(cur, account_id: str) -> str:
 			title,
 			recommendation
 		FROM insights
-		WHERE status='new'
-		AND insight_date = CURRENT_DATE
-		AND account_id = %s
+		WHERE status = 'new'
+			AND insight_date = CURRENT_DATE
+			AND account_id = %s
+			AND type = ANY(%s)
 		ORDER BY priority DESC NULLS LAST
-		LIMIT 10
+		LIMIT %s
 		""",
-		(account_id,),
+		(account_id, list(insight_types), limit),
 	)
-	rows = cur.fetchall()
-	if not rows:
-		return "✅ *Инсайтов за сегодня нет.*\n"
+	return cur.fetchall()
 
-	lines = []
-	lines.append("⚠ *Top инсайты (сегодня)*")
+def build_section(title: str, rows) -> str:
+	if not rows:
+		return ""
+
+	lines = [title]
 	for r in rows:
-		_id, _type, _etype, entity_id, impact, conf, priority, title, rec = r
+		_id, _type, _etype, entity_id, impact, conf, priority, insight_title, rec = r
 		impact = float(impact or 0)
 		conf = float(conf or 1)
-		lines.append(f"• *{title}*")
-		lines.append(f"  `{entity_id}` | impact `{fmt_money(impact)} ₽` | conf `{fmt_num(conf,2)}` | priority `{fmt_money(priority)}`")
+		priority = float(priority or 0)
+
+		lines.append(f"• *{insight_title}*")
+		lines.append(
+			f"  `{entity_id}` | impact `{fmt_money(impact)} ₽` | "
+			f"conf `{fmt_num(conf,2)}` | priority `{fmt_money(priority)}`"
+		)
 		lines.append(f"  {rec}")
+
 	return "\n".join(lines) + "\n"
+
+
+def build_digest_blocks(cur, account_id: str) -> str:
+	risk_rows = fetch_insights_by_types(cur, account_id, RISK_TYPES, MAX_RISKS)
+	opportunity_rows = fetch_insights_by_types(cur, account_id, OPPORTUNITY_TYPES, MAX_OPPORTUNITIES)
+	change_rows = fetch_insights_by_types(cur, account_id, CHANGE_TYPES, MAX_CHANGES)
+
+	parts = []
+
+	if risk_rows:
+		parts.append(build_section("⚠ *Top Risks*", risk_rows))
+
+	if opportunity_rows:
+		parts.append(build_section("🚀 *Opportunities*", opportunity_rows))
+
+	if change_rows:
+		parts.append(build_section("📈 *Recent Changes*", change_rows))
+
+	if not parts:
+		return "✅ *Новых инсайтов за сегодня нет.*\n"
+
+	return "\n".join(parts)
 
 
 def mark_sent(cur, account_id: str):
@@ -156,7 +212,7 @@ def main():
 
 	msg = "🤖 *AI Optimizer — Daily Digest*\n\n"
 	msg += build_kpi_block(cur, account_id) + "\n"
-	msg += build_insights_block(cur, account_id)
+	msg += build_digest_blocks(cur, account_id)
 
 	send_message(msg)
 
