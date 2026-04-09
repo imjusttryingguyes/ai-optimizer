@@ -52,11 +52,12 @@ def send_message(text: str):
 	payload = {
 		"chat_id": CHAT_ID,
 		"text": text,
-		"parse_mode": "Markdown",
 		"disable_web_page_preview": True,
 	}
 	r = requests.post(url, json=payload, timeout=30)
-	r.raise_for_status()
+
+	if not r.ok:
+		raise RuntimeError(f"Telegram sendMessage failed: {r.status_code} | {r.text}")
 
 
 def fmt_money(x):
@@ -145,23 +146,46 @@ def fetch_insights_by_types(cur, account_id: str, insight_types: tuple[str, ...]
 	)
 	return cur.fetchall()
 
-def build_section(title: str, rows) -> str:
+def format_insight_line(row) -> str:
+	(
+		insight_id,
+		insight_type,
+		entity_type,
+		entity_id,
+		impact,
+		confidence,
+		priority,
+		title,
+		recommendation,
+	) = row
+
+	entity_id = str(entity_id or "n/a")
+	title = str(title or insight_type)
+	recommendation = str(recommendation or "")
+	impact = float(impact or 0)
+	confidence = float(confidence or 0)
+	priority = float(priority or 0)
+
+	line = (
+		f"• {title}\n"
+		f"  {entity_id} | impact {impact:,.0f} ₽ | conf {confidence:.2f} | priority {priority:,.0f}"
+	).replace(",", " ")
+
+	if recommendation:
+		line += f"\n  {recommendation}"
+
+	return line
+
+def build_section(title: str, rows: list, limit: int | None = None) -> str:
 	if not rows:
 		return ""
 
-	lines = [title]
-	for r in rows:
-		_id, _type, _etype, entity_id, impact, conf, priority, insight_title, rec = r
-		impact = float(impact or 0)
-		conf = float(conf or 1)
-		priority = float(priority or 0)
+	if limit is not None:
+		rows = rows[:limit]
 
-		lines.append(f"• *{insight_title}*")
-		lines.append(
-			f"  `{entity_id}` | impact `{fmt_money(impact)} ₽` | "
-			f"conf `{fmt_num(conf,2)}` | priority `{fmt_money(priority)}`"
-		)
-		lines.append(f"  {rec}")
+	lines = [title]
+	for row in rows:
+		lines.append(format_insight_line(row))
 
 	return "\n".join(lines) + "\n"
 
@@ -174,13 +198,13 @@ def build_digest_blocks(cur, account_id: str) -> str:
 	parts = []
 
 	if risk_rows:
-		parts.append(build_section("⚠ *Top Risks*", risk_rows))
+		parts.append(build_section("⚠ *Top Risks*", risk_rows, limit=3))
 
 	if opportunity_rows:
-		parts.append(build_section("🚀 *Opportunities*", opportunity_rows))
+		parts.append(build_section("🚀 *Opportunities*", opportunity_rows, limit=3))
 
 	if change_rows:
-		parts.append(build_section("📈 *Recent Changes*", change_rows))
+		parts.append(build_section("📈 *Recent Changes*", change_rows, limit=2))
 
 	if not parts:
 		return "✅ *Новых инсайтов за сегодня нет.*\n"
@@ -213,6 +237,11 @@ def main():
 	msg = "🤖 *AI Optimizer — Daily Digest*\n\n"
 	msg += build_kpi_block(cur, account_id) + "\n"
 	msg += build_digest_blocks(cur, account_id)
+
+	MAX_TG_MESSAGE_LEN = 3800
+
+	if len(msg) > MAX_TG_MESSAGE_LEN:
+		msg = msg[:MAX_TG_MESSAGE_LEN - 40].rstrip() + "\n\n...message truncated"
 
 	send_message(msg)
 
