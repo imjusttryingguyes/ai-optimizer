@@ -5,7 +5,6 @@ Uses APScheduler for background task management (optional)
 
 import logging
 import os
-import psycopg2
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +16,6 @@ try:
 except ImportError:
     APSCHEDULER_AVAILABLE = False
     logger.warning("APScheduler not available - background tasks disabled. Install with: pip install apscheduler")
-
-from analytics.kpi_sync_task import KPIDailySync
 
 
 class KPIScheduler:
@@ -94,6 +91,9 @@ class KPIScheduler:
     @staticmethod
     def _daily_kpi_sync():
         """Background task: Daily KPI synchronization"""
+        import psycopg2
+        from analytics.kpi_sync_task import KPIDailySync
+        
         logger.info("=" * 60)
         logger.info("Starting daily KPI sync task")
         logger.info("=" * 60)

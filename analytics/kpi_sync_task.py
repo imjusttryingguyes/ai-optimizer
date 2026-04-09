@@ -10,7 +10,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 
-from analytics.yandex_api import YandexDirectClient
+from analytics.yandex_api import YandexDirectAPIClient
 from analytics.kpi_engine import KPICalculationEngine
 from analytics.telegram_notifier import TelegramNotifier
 
@@ -30,7 +30,7 @@ class KPIDailySync:
             telegram_token: Telegram bot token (optional)
         """
         self.conn = db_connection
-        self.yandex = YandexDirectClient(yandex_token)
+        self.yandex = YandexDirectAPIClient(yandex_token)
         self.kpi_engine = KPICalculationEngine(db_connection)
         self.telegram = TelegramNotifier(telegram_token) if telegram_token else None
         
