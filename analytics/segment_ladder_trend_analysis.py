@@ -276,9 +276,8 @@ def main():
 					entity_id=f"{profile_name}|{segment_key}|TREND_BAD",
 					severity=80,
 					impact_rub=excess_cost,
-					title=f"Segment trend worsened ({profile_name})",
+					title=f"Segment trend worsened ({build_title(profile, row)})",
 					description=(
-						f"{build_title(profile, row)} | "
 						f"CPA last {RECENT_DAYS}d = {cpa_recent:.0f} ₽, "
 						f"baseline {BASELINE_DAYS}d = {cpa_baseline:.0f} ₽, "
 						f"ratio = {cpa_ratio:.1f}×"
@@ -346,9 +345,8 @@ def main():
 					entity_id=f"{profile_name}|{segment_key}|TREND_GOOD",
 					severity=56,
 					impact_rub=saved_rub,
-					title=f"Segment trend improved ({profile_name})",
+					title=f"Segment trend improved ({build_title(profile, row)})",
 					description=(
-						f"{build_title(profile, row)} | "
 						f"CPA last {RECENT_DAYS}d = {cpa_recent:.0f} ₽, "
 						f"baseline {BASELINE_DAYS}d = {cpa_baseline:.0f} ₽, "
 						f"ratio = {cpa_ratio:.1f}×, "

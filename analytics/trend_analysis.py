@@ -96,6 +96,29 @@ def main():
 				confidence=1.0,
 			)
 
+		# 1b. CPA improved materially
+		if cpa_prev > 0 and cpa_last < cpa_prev * 0.7:
+			change_pct = ((cpa_prev - cpa_last) / cpa_prev) * 100
+			saved_rub = max(0.0, (cpa_prev - cpa_last) * conv_last * 3)  # 3 days
+
+			insert_insight(
+				account_id=account_id,
+				type="ACCOUNT_CPA_TREND_GOOD",
+				entity_type="account",
+				entity_id=account_id,
+				severity=55,
+				impact_rub=saved_rub,
+				title=f"CPA improved by {change_pct:.0f}%",
+				description=f"CPA last 3d = {cpa_last:.0f}, previous 4d = {cpa_prev:.0f}",
+				recommendation="Continue current strategy and consider scaling successful campaigns/segments",
+				evidence={
+					"cpa_last_3d": cpa_last,
+					"cpa_prev_4d": cpa_prev,
+					"change_pct": change_pct,
+				},
+				confidence=1.0,
+			)
+
 		# 2. Leads/day dropped materially
 		if conv_prev > 0 and conv_last < conv_prev * 0.7:
 			change_pct = ((conv_prev - conv_last) / conv_prev) * 100
@@ -119,6 +142,36 @@ def main():
 					"conv_per_day_last_3d": conv_last,
 					"conv_per_day_prev_4d": conv_prev,
 					"lost_leads_per_day": lost_leads_per_day,
+					"cpa_plan": cpa_plan,
+					"estimated_impact_rub": impact,
+					"change_pct": change_pct,
+				},
+				confidence=1.0,
+			)
+
+		# 2b. Leads/day increased materially
+		if conv_prev > 0 and conv_last > conv_prev * 1.5:
+			change_pct = ((conv_last - conv_prev) / conv_prev) * 100
+			additional_leads_per_day = max(0.0, conv_last - conv_prev)
+			impact = additional_leads_per_day * cpa_plan
+
+			insert_insight(
+				account_id=account_id,
+				type="ACCOUNT_LEADS_TREND_GOOD",
+				entity_type="account",
+				entity_id=account_id,
+				severity=50,
+				impact_rub=impact,
+				title=f"Leads/day increased by {change_pct:.0f}%",
+				description=(
+					f"Leads/day last 3d = {conv_last:.1f}, previous 4d = {conv_prev:.1f}, "
+					f"gained = {additional_leads_per_day:.1f}/day, est. impact = {impact:.0f} ₽"
+				),
+				recommendation="Continue successful strategies and consider scaling budget",
+				evidence={
+					"conv_per_day_last_3d": conv_last,
+					"conv_per_day_prev_4d": conv_prev,
+					"additional_leads_per_day": additional_leads_per_day,
 					"cpa_plan": cpa_plan,
 					"estimated_impact_rub": impact,
 					"change_pct": change_pct,

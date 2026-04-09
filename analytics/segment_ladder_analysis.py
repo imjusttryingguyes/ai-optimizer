@@ -220,9 +220,8 @@ def main():
 					entity_id=f"{profile_name}|{segment_key}|CPA_BAD",
 					severity=76,
 					impact_rub=excess_cost,
-					title=f"Segment CPA is too high ({profile_name})",
+					title=f"Segment CPA is too high ({build_title(profile, row)})",
 					description=(
-						f"{build_title(profile, row)} | "
 						f"Segment CPA = {segment_cpa:.0f} ₽, "
 						f"account CPA = {account_cpa:.0f} ₽, "
 						f"ratio = {cpa_ratio:.1f}×"
@@ -286,9 +285,8 @@ def main():
 					entity_id=f"{profile_name}|{segment_key}|WINNER",
 					severity=58,
 					impact_rub=saved_rub,
-					title=f"Segment outperforms account average ({profile_name})",
+					title=f"Segment outperforms account average ({build_title(profile, row)})",
 					description=(
-						f"{build_title(profile, row)} | "
 						f"Segment CPA = {segment_cpa:.0f} ₽, "
 						f"account CPA = {account_cpa:.0f} ₽, "
 						f"ratio = {cpa_ratio:.1f}×"
@@ -349,9 +347,8 @@ def main():
 				entity_id=f"{profile_name}|{segment_key}",
 				severity=74,
 				impact_rub=spend_rub,
-				title=f"Segment wastes budget ({profile_name})",
+				title=f"Segment wastes budget ({build_title(profile, row)})",
 				description=(
-					f"{build_title(profile, row)} | "
 					f"Spent {spend_rub:.0f} ₽ with {clicks} clicks and 0 conversions "
 					f"over the last {WINDOW_DAYS} days"
 				),
