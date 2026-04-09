@@ -46,13 +46,13 @@ def main():
 		SELECT
 			account_id,
 			campaign_id,
-			cost,
+			spend_rub,
 			conversions,
-			cpa_campaign,
-			cpa_account
+			cpa,
+			AVG(cpa) OVER (PARTITION BY account_id) as cpa_account
 		FROM kpi_campaign_vs_account
-		WHERE cost >= %s
-		ORDER BY cost DESC
+		WHERE spend_rub >= %s
+		ORDER BY spend_rub DESC
 	""", (min_cost_for_analysis,))
 
 	rows = cur.fetchall()
@@ -62,16 +62,16 @@ def main():
 	waste = []
 
 	for r in rows:
-		account_id, campaign_id, cost, conv, cpa_c, cpa_a = r
+		account_id, campaign_id, spend_rub, conv, cpa_c, cpa_a = r
 
-		cost = float(cost or 0)
+		spend_rub = float(spend_rub or 0)
 		conv = float(conv or 0)
 		cpa_a = float(cpa_a) if cpa_a is not None else None
 		cpa_c = float(cpa_c) if cpa_c is not None else None
 
 		# Слив: есть расход, нет конверсий
-		if conv == 0 and cost >= waste_cost_threshold:
-			waste.append((campaign_id, cost))
+		if conv == 0 and spend_rub >= waste_cost_threshold:
+			waste.append((campaign_id, spend_rub))
 			continue
 
 		if cpa_a is None or cpa_c is None:
@@ -79,32 +79,32 @@ def main():
 
 		# Плохие/хорошие относительно CPA аккаунта
 		if cpa_c > cpa_a * worst_multiplier:
-			worst.append((campaign_id, cost, conv, cpa_c, cpa_a))
+			worst.append((campaign_id, spend_rub, conv, cpa_c, cpa_a))
 		elif cpa_c < cpa_a * best_multiplier:
-			best.append((campaign_id, cost, conv, cpa_c, cpa_a))
+			best.append((campaign_id, spend_rub, conv, cpa_c, cpa_a))
 
 	print("===== CAMPAIGN ANALYSIS (7d window, or available days) =====\n")
 
 	if worst:
 		print("⚠ WORST CAMPAIGNS (CPA > account * 1.5)")
-		for cid, cost, conv, cpa_c, cpa_a in worst[:10]:
-			print(f"- {cid}: spend {fmt_money(cost)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_c)} (acct {fmt_num(cpa_a)})")
+		for cid, spend_rub, conv, cpa_c, cpa_a in worst[:10]:
+			print(f"- {cid}: spend {fmt_money(spend_rub)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_c)} (acct {fmt_num(cpa_a)})")
 		print("")
 	else:
 		print("✅ No WORST campaigns by threshold\n")
 
 	if waste:
 		print("💸 SPEND WITHOUT CONVERSIONS (conv=0 and spend>=5000)")
-		for cid, cost in waste[:10]:
-			print(f"- {cid}: spend {fmt_money(cost)}")
+		for cid, spend_rub in waste[:10]:
+			print(f"- {cid}: spend {fmt_money(spend_rub)}")
 		print("")
 	else:
 		print("✅ No big spend-without-conv cases\n")
 
 	if best:
 		print("🚀 BEST CAMPAIGNS (CPA < account * 0.7)")
-		for cid, cost, conv, cpa_c, cpa_a in best[:10]:
-			print(f"- {cid}: spend {fmt_money(cost)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_c)} (acct {fmt_num(cpa_a)})")
+		for cid, spend_rub, conv, cpa_c, cpa_a in best[:10]:
+			print(f"- {cid}: spend {fmt_money(spend_rub)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_c)} (acct {fmt_num(cpa_a)})")
 		print("")
 	else:
 		print("ℹ No BEST campaigns by threshold\n")

@@ -26,15 +26,15 @@ def main():
 			client_login,
 			cpa_plan,
 			conversions_plan_daily,
-			cost_week,
-			conv_week,
+			spend_rub_week,
+			conversions_week,
 			data_days_week,
 			cpa_week,
-			conv_week_per_day,
+			conversions_per_day_week,
 			cpa_30d,
-			conv_30d_per_day
+			conversions_per_day_30d
 		FROM kpi_account_vs_plan
-		WHERE is_active = true
+		WHERE account_id IS NOT NULL
 		ORDER BY account_id
 	"""
     )
@@ -47,7 +47,7 @@ def main():
             client_login,
             cpa_plan,
             conv_plan_daily,
-            cost_week,
+            spend_week,
             conv_week,
             data_days_week,
             cpa_week,

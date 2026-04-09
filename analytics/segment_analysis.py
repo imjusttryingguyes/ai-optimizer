@@ -40,13 +40,13 @@ def main():
 			account_id,
 			device,
 			ad_network_type,
-			cost,
+			spend_rub,
 			conversions,
 			cpa_segment,
 			cpa_account
 		FROM kpi_segment_device_network
-		WHERE cost >= %s
-		ORDER BY cost DESC
+		WHERE spend_rub >= %s
+		ORDER BY spend_rub DESC
 	""", (min_cost,))
 
 	rows = cur.fetchall()
@@ -55,12 +55,12 @@ def main():
 	best = []
 	waste = []
 
-	for account_id, device, net, cost, conv, cpa_s, cpa_a in rows:
-		cost = float(cost or 0)
+	for account_id, device, net, spend_rub, conv, cpa_s, cpa_a in rows:
+		spend_rub = float(spend_rub or 0)
 		conv = float(conv or 0)
 
-		if conv == 0 and cost >= waste_cost_no_conv:
-			waste.append((device, net, cost))
+		if conv == 0 and spend_rub >= waste_cost_no_conv:
+			waste.append((device, net, spend_rub))
 			continue
 
 		if cpa_s is None or cpa_a is None:
@@ -70,32 +70,32 @@ def main():
 		cpa_a = float(cpa_a)
 
 		if cpa_s > cpa_a * worst_mult:
-			worst.append((device, net, cost, conv, cpa_s, cpa_a))
+			worst.append((device, net, spend_rub, conv, cpa_s, cpa_a))
 		elif cpa_s < cpa_a * best_mult:
-			best.append((device, net, cost, conv, cpa_s, cpa_a))
+			best.append((device, net, spend_rub, conv, cpa_s, cpa_a))
 
 	print("===== SEGMENT ANALYSIS: DEVICE x NETWORK (7d window, or available days) =====\n")
 
 	if worst:
 		print("⚠ WORST SEGMENTS (CPA > account * 1.5)")
-		for device, net, cost, conv, cpa_s, cpa_a in worst[:10]:
-			print(f"- {device} / {net}: spend {fmt_money(cost)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_s)} (acct {fmt_num(cpa_a)})")
+		for device, net, spend_rub, conv, cpa_s, cpa_a in worst[:10]:
+			print(f"- {device} / {net}: spend {fmt_money(spend_rub)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_s)} (acct {fmt_num(cpa_a)})")
 		print("")
 	else:
 		print("✅ No WORST segments by threshold\n")
 
 	if waste:
 		print("💸 SPEND WITHOUT CONVERSIONS (conv=0 and spend>=5000)")
-		for device, net, cost in waste[:10]:
-			print(f"- {device} / {net}: spend {fmt_money(cost)}")
+		for device, net, spend_rub in waste[:10]:
+			print(f"- {device} / {net}: spend {fmt_money(spend_rub)}")
 		print("")
 	else:
 		print("✅ No big spend-without-conv segments\n")
 
 	if best:
 		print("🚀 BEST SEGMENTS (CPA < account * 0.7)")
-		for device, net, cost, conv, cpa_s, cpa_a in best[:10]:
-			print(f"- {device} / {net}: spend {fmt_money(cost)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_s)} (acct {fmt_num(cpa_a)})")
+		for device, net, spend_rub, conv, cpa_s, cpa_a in best[:10]:
+			print(f"- {device} / {net}: spend {fmt_money(spend_rub)} | conv {fmt_num(conv)} | CPA {fmt_num(cpa_s)} (acct {fmt_num(cpa_a)})")
 		print("")
 	else:
 		print("ℹ No BEST segments by threshold\n")

@@ -65,17 +65,13 @@ def main():
 		SELECT
 			account_id,
 			placement,
-			cost_rub,
+			spend_rub,
 			clicks,
 			impressions,
-			conversions,
-			acct_cost_rub,
-			acct_clicks,
-			acct_impressions,
-			acct_conversions
+			conversions
 		FROM kpi_rsy_placements_7d
-		WHERE cost_rub >= %s
-		ORDER BY cost_rub DESC
+		WHERE spend_rub >= %s
+		ORDER BY spend_rub DESC
 	""", (min_cost,))
 
 	rows = cur.fetchall()
@@ -89,8 +85,13 @@ def main():
 	# Baseline per account
 	# (в рамках 1 аккаунта; на будущее можно делать по client_login)
 	acct_id = rows[0][0]
-	acct_clicks = float(rows[0][7] or 0)
-	acct_conversions = float(rows[0][9] or 0)
+	
+	# Calculate account totals from all rows
+	total_clicks = sum(float(r[3] or 0) for r in rows)
+	total_conversions = sum(float(r[5] or 0) for r in rows)
+	
+	acct_clicks = total_clicks
+	acct_conversions = total_conversions
 
 	acct_cr = (acct_conversions / acct_clicks) if acct_clicks > 0 else 0.0
 	acct_low, acct_high = wilson_interval(acct_conversions, acct_clicks)
@@ -101,16 +102,16 @@ def main():
 	top_spend = []
 
 	for r in rows:
-		account_id, placement, cost, clicks, impr, conv, acct_cost, acct_clk, acct_impr, acct_conv = r
-		cost = float(cost or 0)
+		account_id, placement, spend_rub, clicks, impr, conv = r
+		spend_rub = float(spend_rub or 0)
 		clicks = float(clicks or 0)
 		conv = float(conv or 0)
 
-		top_spend.append((placement, cost, clicks, conv))
+		top_spend.append((placement, spend_rub, clicks, conv))
 
 		# Слив без конверсий
-		if conv <= 0 and cost >= waste_cost_no_conv:
-			waste.append((placement, cost, clicks))
+		if conv <= 0 and spend_rub >= waste_cost_no_conv:
+			waste.append((placement, spend_rub, clicks))
 			continue
 
 		# Значимость по CR
@@ -124,16 +125,16 @@ def main():
 			# приоритет = “переплата” относительно baseline CPA аккаунта (грубо)
 			# если baseline CR есть: ожидаемые конверсии = clicks * acct_cr
 			exp_conv = clicks * acct_cr
-			waste_rub = cost  # fallback
+			waste_rub = spend_rub  # fallback
 			if exp_conv > 0:
 				# ожидаемая стоимость конверсии на аккаунте приблизительно = acct_cost/acct_conv, но у нас тут только CR,
 				# поэтому упрощаем приоритетом через cost и дефицит конверсий:
-				waste_rub = max(0.0, cost * (1.0 - (conv / exp_conv)))
-			worst_sig.append((placement, cost, clicks, conv, seg_low, seg_high, waste_rub))
+				waste_rub = max(0.0, spend_rub * (1.0 - (conv / exp_conv)))
+			worst_sig.append((placement, spend_rub, clicks, conv, seg_low, seg_high, waste_rub))
 
 		# Площадка статистически лучше: её lower > account upper
 		elif seg_low > acct_high:
-			best_sig.append((placement, cost, clicks, conv, seg_low, seg_high))
+			best_sig.append((placement, spend_rub, clicks, conv, seg_low, seg_high))
 
 	print("===== RSYA PLACEMENTS ANALYSIS (7d window, or available days) =====")
 	print(f"Account: {acct_id}")
@@ -141,30 +142,30 @@ def main():
 
 	# TOP spend overview (helpful always)
 	print("📌 TOP SPEND PLACEMENTS")
-	for placement, cost, clicks, conv in top_spend[:10]:
+	for placement, spend_rub, clicks, conv in top_spend[:10]:
 		cr = (conv / clicks) if clicks > 0 else 0.0
-		print(f"- {placement}: spend {fmt_money(cost)} | clicks {int(clicks)} | conv {fmt_num(conv)} | CR {fmt_num(cr * 100)}%")
+		print(f"- {placement}: spend {fmt_money(spend_rub)} | clicks {int(clicks)} | conv {fmt_num(conv)} | CR {fmt_num(cr * 100)}%")
 	print("")
 
 	if waste:
 		print(f"💸 SPEND WITHOUT CONVERSIONS (cost >= {fmt_money(waste_cost_no_conv)})")
-		for placement, cost, clicks in waste[:15]:
-			print(f"- {placement}: spend {fmt_money(cost)} | clicks {int(clicks)} | conv 0")
+		for placement, spend_rub, clicks in waste[:15]:
+			print(f"- {placement}: spend {fmt_money(spend_rub)} | clicks {int(clicks)} | conv 0")
 			confidence = min(1.0, clicks / 100)
-			print("DEBUG INSIGHT:", placement, "clicks", clicks, "confidence", confidence, "cost", cost)
+			print("DEBUG INSIGHT:", placement, "clicks", clicks, "confidence", confidence, "spend_rub", spend_rub)
 			insert_insight(
 				account_id=acct_id,
 				type="RSYA_WASTE",
 				entity_type="placement",
 				entity_id=placement,
 				severity=80 * confidence,
-				impact_rub=cost,
+				impact_rub=spend_rub,
 				title=f"Spend without conversions on {placement}",
-				description=f"Placement spent {cost:.0f} ₽ with {clicks} clicks and 0 conversions",
+				description=f"Placement spent {spend_rub:.0f} ₽ with {clicks} clicks and 0 conversions",
 				recommendation="Consider excluding this placement from RSYA",
 				evidence={
 					"clicks": clicks,
-					"cost": cost,
+					"spend_rub": spend_rub,
 					"conv": conv
 				},
 				confidence=confidence
