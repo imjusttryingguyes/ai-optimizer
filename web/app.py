@@ -73,106 +73,134 @@ def get_insights(days=7, insight_type=None, account_id=None, severity_min=0):
 
 # Get insights statistics
 def get_statistics(days=7):
-	conn = get_conn()
-	cur = conn.cursor()
-	
-	cur.execute(f"""
-		SELECT 
-			COUNT(*) as total_insights,
-			COUNT(DISTINCT account_id) as accounts_affected,
-			SUM(impact_rub) as total_impact,
-			AVG(severity) as avg_severity,
-			MAX(created_at) as last_update
-		FROM insights
-		WHERE created_at >= CURRENT_DATE - INTERVAL '{days} days'
-	""")
-	
-	row = cur.fetchone()
-	cur.close()
-	conn.close()
-	
-	return {
-		'total_insights': row[0] or 0,
-		'accounts_affected': row[1] or 0,
-		'total_impact': float(row[2] or 0),
-		'avg_severity': float(row[3] or 0) if row[3] else 0,
-		'last_update': row[4].isoformat() if row[4] else None
-	}
+	try:
+		conn = get_conn()
+		cur = conn.cursor()
+		
+		cur.execute(f"""
+			SELECT 
+				COUNT(*) as total_insights,
+				COUNT(DISTINCT account_id) as accounts_affected,
+				SUM(impact_rub) as total_impact,
+				AVG(severity) as avg_severity,
+				MAX(created_at) as last_update
+			FROM insights
+			WHERE created_at >= CURRENT_DATE - INTERVAL '{days} days'
+		""")
+		
+		row = cur.fetchone()
+		cur.close()
+		conn.close()
+		
+		return {
+			'total_insights': row[0] or 0,
+			'accounts_affected': row[1] or 0,
+			'total_impact': float(row[2] or 0),
+			'avg_severity': float(row[3] or 0) if row[3] else 0,
+			'last_update': row[4].isoformat() if row[4] else None
+		}
+	except Exception as e:
+		print(f"Error getting statistics: {e}")
+		return {
+			'total_insights': 0,
+			'accounts_affected': 0,
+			'total_impact': 0,
+			'avg_severity': 0,
+			'last_update': None,
+			'error': str(e)
+		}
 
 # Get insights by type for chart
 def get_insights_by_type(days=7):
-	conn = get_conn()
-	cur = conn.cursor()
-	
-	cur.execute(f"""
-		SELECT 
-			type,
-			COUNT(*) as count,
-			SUM(impact_rub) as total_impact
-		FROM insights
-		WHERE created_at >= CURRENT_DATE - INTERVAL '{days} days'
-		GROUP BY type
-		ORDER BY count DESC
-	""")
-	
-	data = cur.fetchall()
-	cur.close()
-	conn.close()
-	
-	return [{
-		'type': row[0],
-		'count': row[1],
-		'impact': float(row[2] or 0)
-	} for row in data]
+	try:
+		conn = get_conn()
+		cur = conn.cursor()
+		
+		cur.execute(f"""
+			SELECT 
+				type,
+				COUNT(*) as count,
+				SUM(impact_rub) as total_impact
+			FROM insights
+			WHERE created_at >= CURRENT_DATE - INTERVAL '{days} days'
+			GROUP BY type
+			ORDER BY count DESC
+		""")
+		
+		data = cur.fetchall()
+		cur.close()
+		conn.close()
+		
+		return [{
+			'type': row[0],
+			'count': row[1],
+			'impact': float(row[2] or 0)
+		} for row in data]
+	except Exception as e:
+		print(f"Error getting insights by type: {e}")
+		return []
 
 # Get severity distribution
 def get_severity_distribution(days=7):
-	conn = get_conn()
-	cur = conn.cursor()
-	
-	cur.execute(f"""
-		SELECT 
-			CASE 
-				WHEN severity >= 80 THEN 'Critical'
-				WHEN severity >= 60 THEN 'High'
-				WHEN severity >= 40 THEN 'Medium'
-				ELSE 'Low'
-			END as severity_level,
-			COUNT(*) as count
-		FROM insights
-		WHERE created_at >= CURRENT_DATE - INTERVAL '{days} days'
-		GROUP BY severity_level
-		ORDER BY CASE 
-			WHEN severity_level = 'Critical' THEN 1
-			WHEN severity_level = 'High' THEN 2
-			WHEN severity_level = 'Medium' THEN 3
-			ELSE 4
-		END
-	""")
-	
-	data = cur.fetchall()
-	cur.close()
-	conn.close()
-	
-	return [{
-		'level': row[0],
-		'count': row[1]
-	} for row in data]
+	try:
+		conn = get_conn()
+		cur = conn.cursor()
+		
+		cur.execute(f"""
+			WITH severity_levels AS (
+				SELECT 
+					CASE 
+						WHEN severity >= 80 THEN 'Critical'
+						WHEN severity >= 60 THEN 'High'
+						WHEN severity >= 40 THEN 'Medium'
+						ELSE 'Low'
+					END as level
+				FROM insights
+				WHERE created_at >= CURRENT_DATE - INTERVAL '{days} days'
+			)
+			SELECT 
+				level,
+				COUNT(*) as count
+			FROM severity_levels
+			GROUP BY level
+			ORDER BY CASE 
+				WHEN level = 'Critical' THEN 1
+				WHEN level = 'High' THEN 2
+				WHEN level = 'Medium' THEN 3
+				ELSE 4
+			END
+		""")
+		
+		data = cur.fetchall()
+		cur.close()
+		conn.close()
+		
+		return [{
+			'level': row[0],
+			'count': row[1]
+		} for row in data]
+	except Exception as e:
+		print(f"Error getting severity distribution: {e}")
+		return []
 
 # Routes
 @app.route('/')
 def index():
-	days = request.args.get('days', 7, type=int)
-	stats = get_statistics(days)
-	insights_by_type = get_insights_by_type(days)
-	severity_dist = get_severity_distribution(days)
-	
-	return render_template('index.html',
-		stats=stats,
-		insights_by_type=insights_by_type,
-		severity_dist=severity_dist,
-		days=days
-	)
+	try:
+		days = request.args.get('days', 7, type=int)
+		stats = get_statistics(days)
+		insights_by_type = get_insights_by_type(days)
+		severity_dist = get_severity_distribution(days)
+		
+		return render_template('index.html',
+			stats=stats,
+			insights_by_type=insights_by_type,
+			severity_dist=severity_dist,
+			days=days
+		)
+	except Exception as e:
+		print(f"Error in index route: {e}")
+		return render_template('error.html', error=str(e)), 500
 
 @app.route('/insights')
 def insights():
