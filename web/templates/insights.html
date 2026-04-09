@@ -5,7 +5,7 @@
 {% block content %}
 <div class="row mb-4">
 	<div class="col-md-12">
-		<h1 class="mb-4"><i class="bi bi-search"></i> Все инсайты</h1>
+		<h1 class="mb-4"><i class="bi bi-search"></i> {{ page_title }}</h1>
 	</div>
 </div>
 
@@ -13,40 +13,76 @@
 <div class="card mb-4">
 	<div class="card-body">
 		<form class="row g-3" method="get">
+			<!-- Mode Selection (Settings) -->
 			<div class="col-md-3">
-				<label class="form-label">Период</label>
-				<select class="form-select" name="days">
-					<option value="7" {% if days == 7 %}selected{% endif %}>7 дней</option>
-					<option value="14" {% if days == 14 %}selected{% endif %}>14 дней</option>
-					<option value="30" {% if days == 30 %}selected{% endif %}>30 дней</option>
-					<option value="90" {% if days == 90 %}selected{% endif %}>90 дней</option>
-				</select>
+				<label class="form-label">Настройки</label>
+				<div class="d-grid gap-2">
+					<div>
+						<a href="/insights?mode=7days" class="btn btn-sm {% if selected_mode == '7days' %}btn-primary{% else %}btn-outline-primary{% endif %}" style="width: 100%">
+							📊 7 дней
+						</a>
+					</div>
+					<div>
+						<a href="/insights?mode=30days" class="btn btn-sm {% if selected_mode == '30days' %}btn-primary{% else %}btn-outline-primary{% endif %}" style="width: 100%">
+							📈 30 дней
+						</a>
+					</div>
+					<div>
+						<a href="/insights?mode=trends" class="btn btn-sm {% if selected_mode == 'trends' %}btn-primary{% else %}btn-outline-primary{% endif %}" style="width: 100%">
+							🔄 Тренды
+						</a>
+					</div>
+				</div>
 			</div>
+
+			<!-- Category Selection -->
 			<div class="col-md-3">
-				<label class="form-label">Тип инсайта</label>
-				<select class="form-select" name="type">
-					<option value="">Все типы</option>
-					{% for itype in insight_types %}
-					<option value="{{ itype }}" {% if selected_type == itype %}selected{% endif %}>{{ itype }}</option>
+				<label class="form-label">Тип</label>
+				{% if selected_mode == 'trends' %}
+					<div class="d-grid gap-2">
+						<a href="/insights?mode=trends&category=improvement{% if selected_account %}&account_id={{ selected_account }}{% endif %}{% if selected_severity %}&severity_min={{ selected_severity }}{% endif %}" class="btn btn-sm {% if selected_category == 'improvement' %}btn-success{% else %}btn-outline-success{% endif %}" style="width: 100%">
+							📈 Улучшение
+						</a>
+						<a href="/insights?mode=trends&category=decline{% if selected_account %}&account_id={{ selected_account }}{% endif %}{% if selected_severity %}&severity_min={{ selected_severity }}{% endif %}" class="btn btn-sm {% if selected_category == 'decline' %}btn-danger{% else %}btn-outline-danger{% endif %}" style="width: 100%">
+							📉 Ухудшение
+						</a>
+					</div>
+				{% else %}
+					<div class="d-grid gap-2">
+						<a href="/insights?mode={{ selected_mode }}&category=growth{% if selected_account %}&account_id={{ selected_account }}{% endif %}{% if selected_severity %}&severity_min={{ selected_severity }}{% endif %}" class="btn btn-sm {% if selected_category == 'growth' %}btn-success{% else %}btn-outline-success{% endif %}" style="width: 100%">
+							📈 Точки роста
+						</a>
+						<a href="/insights?mode={{ selected_mode }}&category=decline{% if selected_account %}&account_id={{ selected_account }}{% endif %}{% if selected_severity %}&severity_min={{ selected_severity }}{% endif %}" class="btn btn-sm {% if selected_category == 'decline' %}btn-danger{% else %}btn-outline-danger{% endif %}" style="width: 100%">
+							📉 Точки просадки
+						</a>
+					</div>
+				{% endif %}
+			</div>
+
+			<!-- Account Filter -->
+			<div class="col-md-3">
+				<label class="form-label">Аккаунт</label>
+				<select class="form-select" name="account_id" onchange="updateFilters()">
+					<option value="">Все аккаунты</option>
+					{% for account in accounts %}
+					<option value="{{ account }}" {% if selected_account == account %}selected{% endif %}>{{ account }}</option>
 					{% endfor %}
 				</select>
 			</div>
-			<div class="col-md-3">
-				<label class="form-label">Аккаунт</label>
-				<input type="text" class="form-control" name="account_id" placeholder="ID аккаунта" value="{{ selected_account or '' }}">
-			</div>
+
+			<!-- Severity Filter -->
 			<div class="col-md-3">
 				<label class="form-label">Мин. серьезность</label>
-				<select class="form-select" name="severity_min">
+				<select class="form-select" name="severity_min" onchange="updateFilters()">
 					<option value="0" {% if selected_severity == 0 %}selected{% endif %}>Все</option>
 					<option value="40" {% if selected_severity == 40 %}selected{% endif %}>⚠️ Medium (40+)</option>
 					<option value="60" {% if selected_severity == 60 %}selected{% endif %}>🔴 High (60+)</option>
 					<option value="80" {% if selected_severity == 80 %}selected{% endif %}>🔥 Critical (80+)</option>
 				</select>
 			</div>
+
 			<div class="col-12">
-				<button type="submit" class="btn btn-primary">Найти</button>
-				<a href="/insights" class="btn btn-secondary">Очистить</a>
+				<a href="/insights" class="btn btn-secondary">Очистить фильтры</a>
 			</div>
 		</form>
 	</div>
@@ -64,36 +100,58 @@
 					<th>Дата</th>
 					<th>Серьезность</th>
 					<th>Аккаунт</th>
-					<th>Тип</th>
-					<th>Название</th>
-					<th>Воздействие (₽)</th>
+					{% if selected_mode == 'trends' %}
+						<th>Тренд</th>
+						<th>Воздействие 7д (₽)</th>
+						<th>Воздействие 30д (₽)</th>
+						<th>Изменение (%)</th>
+					{% else %}
+						<th>Название</th>
+						<th>Воздействие (₽)</th>
+					{% endif %}
 				</tr>
 			</thead>
 			<tbody>
 				{% if insights %}
 					{% for insight in insights %}
 					<tr class="insight-row" data-id="{{ insight.id }}" onclick="showInsightModal({{ insight | tojson }})">
-					<td>{{ insight.date_formatted }}</td>
-					<td>
-						{% if insight.severity >= 80 %}
-							<span class="badge bg-danger">🔥 {{ insight.severity }}</span>
-						{% elif insight.severity >= 60 %}
-							<span class="badge bg-warning text-dark">🔴 {{ insight.severity }}</span>
-						{% elif insight.severity >= 40 %}
-							<span class="badge bg-info">⚠️ {{ insight.severity }}</span>
+						<td>{{ insight.date_formatted }}</td>
+						<td>
+							{% if insight.severity >= 80 %}
+								<span class="badge bg-danger">🔥 {{ insight.severity }}</span>
+							{% elif insight.severity >= 60 %}
+								<span class="badge bg-warning text-dark">🔴 {{ insight.severity }}</span>
+							{% elif insight.severity >= 40 %}
+								<span class="badge bg-info">⚠️ {{ insight.severity }}</span>
+							{% else %}
+								<span class="badge bg-secondary">ℹ️ {{ insight.severity }}</span>
+							{% endif %}
+						</td>
+						<td><strong>{{ insight.account_id }}</strong></td>
+						{% if selected_mode == 'trends' %}
+							<td>
+								{% if insight.trend == 'improvement' %}
+									<span class="badge bg-success">📈 Улучшение</span>
+								{% else %}
+									<span class="badge bg-danger">📉 Ухудшение</span>
+								{% endif %}
+							</td>
+							<td class="text-end"><strong>{{ insight.impact_7d|currency }}</strong></td>
+							<td class="text-end"><strong>{{ insight.impact_30d|currency }}</strong></td>
+							<td class="text-end">
+								<strong class="{% if insight.change_percent >= 0 %}text-success{% else %}text-danger{% endif %}">
+									{% if insight.change_percent >= 0 %}+{% endif %}{{ insight.change_percent }}%
+								</strong>
+							</td>
 						{% else %}
-							<span class="badge bg-secondary">ℹ️ {{ insight.severity }}</span>
+							<td>{{ insight.title }}</td>
+							<td class="text-end"><strong>{{ insight.impact_rub|currency }}</strong></td>
 						{% endif %}
-					</td>
-					<td><strong>{{ insight.account_id }}</strong></td>
-					<td><code>{{ insight.type }}</code></td>
-					<td>{{ insight.title }}</td>
-					<td class="text-end"><strong>{{ insight.impact_rub|currency }}</strong></td>
 					</tr>
 					{% endfor %}
 				{% else %}
 					<tr>
-						<td colspan="6" class="text-center text-muted py-4">
+						<td colspan="{% if selected_mode == 'trends' %}7{% else %}6{% endif %}" class="text-center text-muted py-4">
 							<i class="bi bi-inbox"></i> Инсайты не найдены
 						</td>
 					</tr>
@@ -145,6 +203,17 @@
 
 {% block scripts %}
 <script>
+function updateFilters() {
+	const accountId = document.querySelector('select[name="account_id"]').value;
+	const severity = document.querySelector('select[name="severity_min"]').value;
+	
+	let url = '/insights?mode={{ selected_mode }}&category={{ selected_category }}';
+	if (accountId) url += '&account_id=' + accountId;
+	if (severity) url += '&severity_min=' + severity;
+	
+	window.location.href = url;
+}
+
 function showInsightModal(insight) {
 	document.getElementById('modalTitle').textContent = insight.title;
 	document.getElementById('modalAccount').textContent = insight.account_id;

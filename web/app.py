@@ -8,6 +8,31 @@ load_dotenv()
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
+# Register custom filters
+@app.template_filter('currency')
+def currency_filter(value):
+	"""Format number as currency"""
+	try:
+		return f"₽ {int(value):,}".replace(',', ' ')
+	except (ValueError, TypeError):
+		return "₽ 0"
+
+@app.template_filter('thousands')
+def thousands_filter(value):
+	"""Format number with thousands separator"""
+	try:
+		return f"{int(value):,}".replace(',', ' ')
+	except (ValueError, TypeError):
+		return "0"
+
+@app.template_filter('decimal1')
+def decimal1_filter(value):
+	"""Format number with 1 decimal place"""
+	try:
+		return f"{float(value):.1f}"
+	except (ValueError, TypeError):
+		return "0"
+
 # Database connection
 def get_conn():
 	return psycopg2.connect(
@@ -17,6 +42,135 @@ def get_conn():
 		user=os.getenv("DB_USER"),
 		password=os.getenv("DB_PASSWORD"),
 	)
+
+# Insight type classification
+GROWTH_TYPES = {
+	'ACCOUNT_CPA_TREND_GOOD',
+	'SEGMENT_LADDER_TREND_GOOD',
+	'SEGMENT_LADDER_WINNER'
+}
+
+DECLINE_TYPES = {
+	'ACCOUNT_LEADS_TREND_BAD',
+	'SEGMENT_COMBINATION_CPA_BAD',
+	'SEGMENT_COMBINATION_TREND_BAD',
+	'SEGMENT_LADDER_CPA_BAD',
+	'SEGMENT_LADDER_TREND_BAD',
+	'RSYA_WASTE',
+	'SEGMENT_LADDER_WASTE'
+}
+
+def classify_insight_type(insight_type):
+	"""Classify insight as growth or decline"""
+	if insight_type in GROWTH_TYPES:
+		return 'growth'
+	elif insight_type in DECLINE_TYPES:
+		return 'decline'
+	return 'other'
+
+def get_insights_by_period(days=7, account_id=None, severity_min=0):
+	"""Get aggregated insights data by period"""
+	conn = get_conn()
+	cur = conn.cursor()
+	
+	where_clauses = [
+		f"created_at >= CURRENT_DATE - INTERVAL '{days} days'",
+		"severity >= %s" % severity_min
+	]
+	
+	if account_id:
+		where_clauses.append(f"account_id = '{account_id}'")
+	
+	where_sql = " AND ".join(where_clauses)
+	
+	cur.execute(f"""
+		SELECT 
+			id, account_id, type, entity_type, entity_id,
+			severity, impact_rub, title, description, recommendation, created_at
+		FROM insights
+		WHERE {where_sql}
+		ORDER BY severity DESC, impact_rub DESC, created_at DESC
+	""")
+	
+	insights = cur.fetchall()
+	cur.close()
+	conn.close()
+	return insights
+
+def get_trend_data(account_id=None, severity_min=0):
+	"""Calculate trend metrics comparing 7d vs 30d"""
+	conn = get_conn()
+	cur = conn.cursor()
+	
+	account_filter = f"AND account_id = '{account_id}'" if account_id else ""
+	
+	# Get 7-day impact per entity
+	cur.execute(f"""
+		SELECT 
+			COALESCE(account_id, '') as entity,
+			COALESCE(entity_type, '') as etype,
+			COALESCE(entity_id, '') as eid,
+			SUM(impact_rub) as impact_7d,
+			AVG(severity) as avg_severity_7d
+		FROM insights
+		WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+			AND severity >= {severity_min}
+			{account_filter}
+		GROUP BY account_id, entity_type, entity_id
+	""")
+	data_7d = {(r[0], r[1], r[2]): (r[3] or 0, r[4] or 0) for r in cur.fetchall()}
+	
+	# Get 30-day impact per entity
+	cur.execute(f"""
+		SELECT 
+			COALESCE(account_id, '') as entity,
+			COALESCE(entity_type, '') as etype,
+			COALESCE(entity_id, '') as eid,
+			SUM(impact_rub) as impact_30d,
+			AVG(severity) as avg_severity_30d,
+			id, type, title, description, recommendation, created_at
+		FROM insights
+		WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+			AND severity >= {severity_min}
+			{account_filter}
+		GROUP BY account_id, entity_type, entity_id, id, type, title, description, recommendation, created_at
+	""")
+	
+	trends = []
+	for row in cur.fetchall():
+		entity = (row[0], row[1], row[2])
+		impact_30d = row[3] or 0
+		avg_severity_30d = row[4] or 0
+		
+		impact_7d, avg_severity_7d = data_7d.get(entity, (0, 0))
+		
+		# Determine if improving or declining
+		if impact_7d > impact_30d:
+			trend = 'improvement'
+		else:
+			trend = 'decline'
+		
+		trends.append({
+			'entity': row[0],
+			'entity_type': row[1],
+			'entity_id': row[2],
+			'trend': trend,
+			'impact_7d': impact_7d,
+			'impact_30d': impact_30d,
+			'severity_7d': avg_severity_7d,
+			'severity_30d': avg_severity_30d,
+			'id': row[5],
+			'type': row[6],
+			'title': row[7],
+			'description': row[8],
+			'recommendation': row[9],
+			'created_at': row[10]
+		})
+	
+	cur.close()
+	conn.close()
+	
+	return trends
 
 # Get all insight types for filter
 def get_insight_types():
@@ -217,41 +371,87 @@ def index():
 
 @app.route('/insights')
 def insights():
-	days = request.args.get('days', 7, type=int)
-	insight_type = request.args.get('type', None)
-	account_id = request.args.get('account_id', None)
-	severity_min = request.args.get('severity_min', 0, type=int)
-	entity_type = request.args.get('entity_type', None)
-	
-	data = get_insights(days, insight_type, account_id, severity_min, entity_type)
-	insight_types = get_insight_types()
-	entity_types = get_entity_types()
-	
-	insights_list = [{
-		'id': row[0],
-		'account_id': row[1],
-		'type': row[2],
-		'entity_type': row[3],
-		'entity_id': row[4],
-		'severity': row[5],
-		'impact_rub': float(row[6] or 0),
-		'title': row[7],
-		'description': row[8],
-		'recommendation': row[9],
-			'created_at': row[10].isoformat() if row[10] else None,
-			'date_formatted': row[10].strftime('%Y-%m-%d %H:%M') if row[10] else 'N/A'
-	} for row in data]
-	
-	return render_template('insights.html',
-		insights=insights_list,
-		insight_types=insight_types,
-		entity_types=entity_types,
-		selected_type=insight_type,
-		selected_entity=entity_type,
-		selected_account=account_id,
-		selected_severity=severity_min,
-		days=days
-	)
+	try:
+		mode = request.args.get('mode', '7days')
+		insight_category = request.args.get('category', 'growth')
+		account_id = request.args.get('account_id', None)
+		severity_min = request.args.get('severity_min', 0, type=int)
+		
+		insights_list = []
+		page_title = "Инсайты"
+		
+		if mode == 'trends':
+			page_title = "Тренды инсайтов"
+			trend_data = get_trend_data(account_id, severity_min)
+			
+			if insight_category == 'improvement':
+				trend_data = [t for t in trend_data if t['trend'] == 'improvement']
+			else:
+				trend_data = [t for t in trend_data if t['trend'] == 'decline']
+			
+			insights_list = [{
+				'id': t['id'],
+				'account_id': t['entity'],
+				'type': t['type'],
+				'entity_type': t['entity_type'],
+				'entity_id': t['entity_id'],
+				'severity': t['severity_7d'],
+				'impact_rub': float(t['impact_7d']),
+				'title': t['title'],
+				'description': t['description'],
+				'recommendation': t['recommendation'],
+				'created_at': t['created_at'].isoformat() if t['created_at'] else None,
+				'date_formatted': t['created_at'].strftime('%Y-%m-%d %H:%M') if t['created_at'] else 'N/A',
+				'trend': t['trend'],
+				'impact_7d': float(t['impact_7d']),
+				'impact_30d': float(t['impact_30d']),
+				'change_percent': round(((t['impact_7d'] - t['impact_30d']) / t['impact_30d'] * 100) if t['impact_30d'] > 0 else 0, 1)
+			} for t in trend_data]
+		else:
+			days = 7 if mode == '7days' else 30
+			page_title = f"Инсайты ({days} дней)"
+			data = get_insights_by_period(days, account_id, severity_min)
+			
+			insights_list = []
+			for row in data:
+				classification = classify_insight_type(row[2])
+				if (insight_category == 'growth' and classification == 'growth') or (insight_category == 'decline' and classification == 'decline'):
+					insights_list.append({
+						'id': row[0],
+						'account_id': row[1],
+						'type': row[2],
+						'entity_type': row[3],
+						'entity_id': row[4],
+						'severity': row[5],
+						'impact_rub': float(row[6] or 0),
+						'title': row[7],
+						'description': row[8],
+						'recommendation': row[9],
+						'created_at': row[10].isoformat() if row[10] else None,
+						'date_formatted': row[10].strftime('%Y-%m-%d %H:%M') if row[10] else 'N/A'
+					})
+		
+		conn = get_conn()
+		cur = conn.cursor()
+		cur.execute("SELECT DISTINCT account_id FROM insights ORDER BY account_id")
+		accounts = [row[0] for row in cur.fetchall()]
+		cur.close()
+		conn.close()
+		
+		return render_template('insights.html',
+			insights=insights_list,
+			accounts=accounts,
+			selected_account=account_id,
+			selected_severity=severity_min,
+			selected_mode=mode,
+			selected_category=insight_category,
+			page_title=page_title
+		)
+	except Exception as e:
+		print(f"Error in insights route: {e}")
+		import traceback
+		traceback.print_exc()
+		return render_template('error.html', error=str(e)), 500
 
 @app.route('/segment-combinations')
 def segment_combinations():
@@ -344,29 +544,4 @@ def top_accounts():
 	})
 
 if __name__ == '__main__':
-	# Register custom filters
-	@app.template_filter('currency')
-	def currency_filter(value):
-		"""Format number as currency"""
-		try:
-			return f"₽ {int(value):,}".replace(',', ' ')
-		except (ValueError, TypeError):
-			return "₽ 0"
-	
-	@app.template_filter('thousands')
-	def thousands_filter(value):
-		"""Format number with thousands separator"""
-		try:
-			return f"{int(value):,}".replace(',', ' ')
-		except (ValueError, TypeError):
-			return "0"
-	
-	@app.template_filter('decimal1')
-	def decimal1_filter(value):
-		"""Format number with 1 decimal place"""
-		try:
-			return f"{float(value):.1f}"
-		except (ValueError, TypeError):
-			return "0"
-	
 	app.run(debug=True, host='0.0.0.0', port=5000)
