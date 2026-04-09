@@ -176,52 +176,61 @@ def format_insight_line(row) -> str:
 
 	return line
 
-def build_section(title: str, rows: list, limit: int | None = None) -> str:
+def build_section(title: str, rows: list, limit: int | None = None) -> tuple[str, list[int]]:
 	if not rows:
-		return ""
+		return "", []
 
 	if limit is not None:
 		rows = rows[:limit]
 
 	lines = [title]
+	insight_ids = []
 	for row in rows:
 		lines.append(format_insight_line(row))
+		insight_ids.append(row[0])
 
-	return "\n".join(lines) + "\n"
+	return "\n".join(lines) + "\n", insight_ids
 
 
-def build_digest_blocks(cur, account_id: str) -> str:
+def build_digest_blocks(cur, account_id: str) -> tuple[str, list[int]]:
 	risk_rows = fetch_insights_by_types(cur, account_id, RISK_TYPES, MAX_RISKS)
 	opportunity_rows = fetch_insights_by_types(cur, account_id, OPPORTUNITY_TYPES, MAX_OPPORTUNITIES)
 	change_rows = fetch_insights_by_types(cur, account_id, CHANGE_TYPES, MAX_CHANGES)
 
 	parts = []
+	all_ids = []
 
 	if risk_rows:
-		parts.append(build_section("⚠ *Top Risks*", risk_rows, limit=3))
+		text, ids = build_section("⚠ *Top Risks*", risk_rows, limit=3)
+		parts.append(text)
+		all_ids.extend(ids)
 
 	if opportunity_rows:
-		parts.append(build_section("🚀 *Opportunities*", opportunity_rows, limit=3))
+		text, ids = build_section("🚀 *Opportunities*", opportunity_rows, limit=3)
+		parts.append(text)
+		all_ids.extend(ids)
 
 	if change_rows:
-		parts.append(build_section("📈 *Recent Changes*", change_rows, limit=2))
+		text, ids = build_section("📈 *Recent Changes*", change_rows, limit=2)
+		parts.append(text)
+		all_ids.extend(ids)
 
 	if not parts:
-		return "✅ *Новых инсайтов за сегодня нет.*\n"
+		return "✅ *Новых инсайтов за сегодня нет.*\n", []
 
-	return "\n".join(parts)
+	return "\n".join(parts), all_ids
 
 
-def mark_sent(cur, account_id: str):
+def mark_sent(cur, insight_ids: list[int]):
+	if not insight_ids:
+		return
 	cur.execute(
 		"""
 		UPDATE insights
 		SET status='sent', updated_at=now()
-		WHERE status='new'
-		AND insight_date = CURRENT_DATE
-		AND account_id = %s
+		WHERE id = ANY(%s)
 		""",
-		(account_id,),
+		(insight_ids,),
 	)
 
 
@@ -236,7 +245,8 @@ def main():
 
 	msg = "🤖 *AI Optimizer — Daily Digest*\n\n"
 	msg += build_kpi_block(cur, account_id) + "\n"
-	msg += build_digest_blocks(cur, account_id)
+	digest_text, sent_ids = build_digest_blocks(cur, account_id)
+	msg += digest_text
 
 	MAX_TG_MESSAGE_LEN = 3800
 
@@ -245,7 +255,7 @@ def main():
 
 	send_message(msg)
 
-	mark_sent(cur, account_id)
+	mark_sent(cur, sent_ids)
 	conn.commit()
 
 	cur.close()
