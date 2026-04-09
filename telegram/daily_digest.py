@@ -192,33 +192,27 @@ def build_section(title: str, rows: list, limit: int | None = None) -> tuple[str
 	return "\n".join(lines) + "\n", insight_ids
 
 
-def build_digest_blocks(cur, account_id: str) -> tuple[str, list[int]]:
+def build_digest_blocks(cur, account_id: str) -> list[tuple[str, list[int]]]:
+	"""Returns list of (section_text, insight_ids) tuples for each section."""
 	risk_rows = fetch_insights_by_types(cur, account_id, RISK_TYPES, MAX_RISKS)
 	opportunity_rows = fetch_insights_by_types(cur, account_id, OPPORTUNITY_TYPES, MAX_OPPORTUNITIES)
 	change_rows = fetch_insights_by_types(cur, account_id, CHANGE_TYPES, MAX_CHANGES)
 
-	parts = []
-	all_ids = []
+	sections = []
 
 	if risk_rows:
 		text, ids = build_section("⚠ *Top Risks*", risk_rows, limit=3)
-		parts.append(text)
-		all_ids.extend(ids)
+		sections.append((text, ids))
 
 	if opportunity_rows:
 		text, ids = build_section("🚀 *Opportunities*", opportunity_rows, limit=3)
-		parts.append(text)
-		all_ids.extend(ids)
+		sections.append((text, ids))
 
 	if change_rows:
 		text, ids = build_section("📈 *Recent Changes*", change_rows, limit=2)
-		parts.append(text)
-		all_ids.extend(ids)
+		sections.append((text, ids))
 
-	if not parts:
-		return "✅ *Новых инсайтов за сегодня нет.*\n", []
-
-	return "\n".join(parts), all_ids
+	return sections
 
 
 def mark_sent(cur, insight_ids: list[int]):
@@ -243,15 +237,27 @@ def main():
 	conn = get_conn()
 	cur = conn.cursor()
 
-	msg = "🤖 *AI Optimizer — Daily Digest*\n\n"
-	msg += build_kpi_block(cur, account_id) + "\n"
-	digest_text, sent_ids = build_digest_blocks(cur, account_id)
-	msg += digest_text
-
 	MAX_TG_MESSAGE_LEN = 3800
 
-	if len(msg) > MAX_TG_MESSAGE_LEN:
-		msg = msg[:MAX_TG_MESSAGE_LEN - 40].rstrip() + "\n\n...message truncated"
+	msg = "🤖 *AI Optimizer — Daily Digest*\n\n"
+	msg += build_kpi_block(cur, account_id) + "\n"
+	
+	sections = build_digest_blocks(cur, account_id)
+	sent_ids = []
+
+	if not sections:
+		msg += "✅ *Новых инсайтов за сегодня нет.*\n"
+	else:
+		for section_text, section_ids in sections:
+			msg_with_section = msg + section_text
+			
+			if len(msg_with_section) <= MAX_TG_MESSAGE_LEN:
+				msg = msg_with_section
+				sent_ids.extend(section_ids)
+			else:
+				# Section doesn't fit - add truncation notice and stop
+				msg += "\n⏸ _Остальные инсайты завтра_"
+				break
 
 	send_message(msg)
 
