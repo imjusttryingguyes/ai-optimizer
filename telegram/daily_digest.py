@@ -19,9 +19,10 @@ def get_conn():
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-MAX_RISKS = 5
-MAX_OPPORTUNITIES = 5
-MAX_CHANGES = 5
+# Section limits - risks are most important, then opportunities, then changes
+MAX_RISKS = 8
+MAX_OPPORTUNITIES = 4
+MAX_CHANGES = 3
 
 RISK_TYPES = (
 	"ACCOUNT_CPA_TREND_BAD",
@@ -121,6 +122,51 @@ def build_kpi_block(cur, account_id: str) -> str:
 	lines.append(f"• Leads/day: week `{fmt_num(conv_day_week,1)}` / plan `{fmt_num(conv_day_plan,1)}` / 30d `{fmt_num(conv_day_30d,1)}`")
 	return "\n".join(lines) + "\n"
 
+def build_data_health_block(cur, account_id: str) -> str:
+	"""Build data quality block with indicators."""
+	cur.execute(
+		"""
+		SELECT
+			COALESCE(data_days_week, 0) AS data_days_week,
+			COALESCE(data_days_30d, 0) AS data_days_30d
+		FROM kpi_account_vs_plan
+		WHERE account_id = %s
+		LIMIT 1
+		""",
+		(account_id,),
+	)
+	
+	row = cur.fetchone()
+	if not row:
+		return ""
+
+	data_days_week, data_days_30d = row
+	
+	lines = []
+	lines.append(f"_📊 Data Health_")
+	
+	# Week health indicator
+	if data_days_week >= 6:
+		week_indicator = "✅"
+	elif data_days_week >= 3:
+		week_indicator = "⚠️"
+	else:
+		week_indicator = "❌"
+	
+	# 30d health indicator
+	if data_days_30d >= 25:
+		month_indicator = "✅"
+	elif data_days_30d >= 15:
+		month_indicator = "⚠️"
+	else:
+		month_indicator = "❌"
+	
+	lines.append(f"• Week: {week_indicator} {int(data_days_week)}/7 days")
+	lines.append(f"• Month: {month_indicator} {int(data_days_30d)}/30 days")
+	
+	return "\n".join(lines) + "\n"
+
+
 def fetch_insights_by_types(cur, account_id: str, insight_types: tuple[str, ...], limit: int):
 	cur.execute(
 		"""
@@ -159,20 +205,26 @@ def format_insight_line(row) -> str:
 		recommendation,
 	) = row
 
-	entity_id = str(entity_id or "n/a")
-	title = str(title or insight_type)
-	recommendation = str(recommendation or "")
+	entity_id = str(entity_id or "n/a").strip()
+	title = str(title or insight_type).strip()
+	recommendation = str(recommendation or "").strip()
 	impact = float(impact or 0)
 	confidence = float(confidence or 0)
 	priority = float(priority or 0)
 
-	line = (
-		f"• {title}\n"
-		f"  {entity_id} | impact {impact:,.0f} ₽ | conf {confidence:.2f} | priority {priority:,.0f}"
-	).replace(",", " ")
+	# Format impact cleanly
+	impact_str = f"{impact:,.0f}".replace(",", " ")
+	conf_str = f"{confidence:.2f}"
+	priority_str = f"{priority:,.0f}".replace(",", " ")
+
+	line = f"• {title}\n"
+	line += f"  💰 {impact_str} ₽ | ⭐ {conf_str} | 🎯 {priority_str}"
+	
+	if entity_id and entity_id != "n/a":
+		line += f" | {entity_type or 'Entity'}: {entity_id}"
 
 	if recommendation:
-		line += f"\n  {recommendation}"
+		line += f"\n  → {recommendation}"
 
 	return line
 
@@ -201,7 +253,7 @@ def build_digest_blocks(cur, account_id: str) -> list[tuple[str, list[int]]]:
 	sections = []
 
 	if risk_rows:
-		text, ids = build_section("⚠ *Top Risks*", risk_rows, limit=3)
+		text, ids = build_section("⚠ *Top Risks*", risk_rows, limit=5)
 		sections.append((text, ids))
 
 	if opportunity_rows:
@@ -241,6 +293,7 @@ def main():
 
 	msg = "🤖 *AI Optimizer — Daily Digest*\n\n"
 	msg += build_kpi_block(cur, account_id) + "\n"
+	msg += build_data_health_block(cur, account_id) + "\n"
 	
 	sections = build_digest_blocks(cur, account_id)
 	sent_ids = []
