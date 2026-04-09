@@ -3,8 +3,16 @@ import psycopg2
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+	level=logging.INFO,
+	format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -42,6 +50,16 @@ def get_conn():
 		user=os.getenv("DB_USER"),
 		password=os.getenv("DB_PASSWORD"),
 	)
+
+# Initialize KPI scheduler
+try:
+	from analytics.kpi_scheduler import KPIScheduler
+	KPIScheduler.initialize(app)
+	logger.info("KPI Scheduler initialized successfully")
+except ImportError as e:
+	logger.warning(f"Could not import KPI scheduler: {e}")
+except Exception as e:
+	logger.error(f"Error initializing KPI scheduler: {e}")
 
 # Insight type classification
 GROWTH_TYPES = {
