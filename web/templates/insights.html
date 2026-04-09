@@ -119,7 +119,7 @@
 					<tr class="insight-row" onclick="showInsightModal({{ insight | tojson }})">
 						{% if selected_mode == 'trends' %}
 							<td>
-								<code>{{ insight.type }}</code>
+								<div><strong>{{ insight.type_name }}</strong></div>
 								<div class="small text-muted">{{ insight.title }}</div>
 							</td>
 							<td>

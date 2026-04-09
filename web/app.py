@@ -60,6 +60,19 @@ DECLINE_TYPES = {
 	'SEGMENT_LADDER_WASTE'
 }
 
+INSIGHT_TYPE_NAMES = {
+	'ACCOUNT_CPA_TREND_GOOD': 'CPA улучшается',
+	'SEGMENT_LADDER_TREND_GOOD': 'Сегменты улучшаются',
+	'SEGMENT_LADDER_WINNER': 'Выигрышные сегменты',
+	'ACCOUNT_LEADS_TREND_BAD': 'Лиды снижаются',
+	'SEGMENT_COMBINATION_CPA_BAD': 'CPA высокий (комбинации)',
+	'SEGMENT_COMBINATION_TREND_BAD': 'Тренд отрицательный (комбинации)',
+	'SEGMENT_LADDER_CPA_BAD': 'CPA высокий (сегменты)',
+	'SEGMENT_LADDER_TREND_BAD': 'Тренд отрицательный (сегменты)',
+	'RSYA_WASTE': 'Потери бюджета',
+	'SEGMENT_LADDER_WASTE': 'Потери в сегментах'
+}
+
 def classify_insight_type(insight_type):
 	"""Classify insight as growth or decline"""
 	if insight_type in GROWTH_TYPES:
@@ -165,8 +178,12 @@ def get_trend_data(account_id=None, severity_min=0):
 		else:
 			change_pct = 0
 		
+		# Get human-readable type name
+		type_name = INSIGHT_TYPE_NAMES.get(insight_type, insight_type)
+		
 		trends.append({
 			'type': insight_type,
+			'type_name': type_name,
 			'trend': trend,
 			'count_7d': count_7d,
 			'count_30d': count_30d,
@@ -402,18 +419,19 @@ def insights():
 				trend_data = [t for t in trend_data if t['trend'] == 'decline']
 			
 			insights_list = [{
-				'type': t['type'],
-				'severity': t['severity_7d'],
-				'impact_rub': float(t['impact_7d']),
-				'title': t['sample_title'],
-				'description': t['sample_desc'],
-				'trend': t['trend'],
-				'impact_7d': float(t['impact_7d']),
-				'impact_30d': float(t['impact_30d']),
-				'count_7d': t['count_7d'],
-				'count_30d': t['count_30d'],
-				'change_percent': t['change_percent']
-			} for t in trend_data]
+			'type': t['type'],
+			'type_name': t['type_name'],
+			'severity': t['severity_7d'],
+			'impact_rub': float(t['impact_7d']),
+			'title': t['sample_title'],
+			'description': t['sample_desc'],
+			'trend': t['trend'],
+			'impact_7d': float(t['impact_7d']),
+			'impact_30d': float(t['impact_30d']),
+			'count_7d': t['count_7d'],
+			'count_30d': t['count_30d'],
+			'change_percent': t['change_percent']
+		} for t in trend_data]
 		else:
 			days = 7 if mode == '7days' else 30
 			page_title = f"Инсайты ({days} дней)"
@@ -423,6 +441,16 @@ def insights():
 			for row in data:
 				classification = classify_insight_type(row[2])
 				if (insight_category == 'growth' and classification == 'growth') or (insight_category == 'decline' and classification == 'decline'):
+					title = row[7]
+					description = row[8]
+					
+					# Use description as title if title is generic (SEGMENT_LADDER_WINNER case)
+					if 'outperforms account average' in title and description:
+						if '|' in description:
+							title = description.split('|')[1].strip()
+						else:
+							title = description[:80]
+					
 					insights_list.append({
 						'id': row[0],
 						'account_id': row[1],
@@ -431,8 +459,8 @@ def insights():
 						'entity_id': row[4],
 						'severity': row[5],
 						'impact_rub': float(row[6] or 0),
-						'title': row[7],
-						'description': row[8],
+						'title': title,
+						'description': description,
 						'recommendation': row[9],
 						'created_at': row[10].isoformat() if row[10] else None,
 						'date_formatted': row[10].strftime('%Y-%m-%d %H:%M') if row[10] else 'N/A'
