@@ -34,9 +34,35 @@ def has_unknown_values(*values):
 	for value in values:
 		if value is None:
 			return True
+		if isinstance(value, str) and not value.strip():
+			return True
+		if isinstance(value, (int, float)) and value == 0:
+			return True
 		if str(value).upper() == "UNKNOWN":
 			return True
 	return False
+
+
+def build_segment_label(campaign_id, adgroup_id, criterion_id, device,
+		ad_network_type, location_of_presence_name, targeting_location_name,
+		age, gender, weekday):
+	parts = [
+		f"weekday={weekday}",
+		f"campaign_id={campaign_id}",
+		f"adgroup_id={adgroup_id}",
+		f"criterion_id={criterion_id}",
+	]
+	if location_of_presence_name:
+		parts.append(f"location={location_of_presence_name}")
+	if targeting_location_name:
+		parts.append(f"targeting={targeting_location_name}")
+	parts.extend([
+		f"device={device}",
+		f"age={age}",
+		f"gender={gender}",
+		f"network={ad_network_type}",
+	])
+	return ", ".join(parts)
 
 
 def main():
@@ -47,10 +73,16 @@ def main():
 		SELECT
 			account_id,
 			client_login,
+			campaign_id,
+			adgroup_id,
+			criterion_id,
 			ad_network_type,
 			device,
+			location_of_presence_name,
+			targeting_location_name,
 			age,
 			gender,
+			weekday,
 			data_days_recent_7d,
 			data_days_baseline_23d,
 			impressions_recent_7d,
@@ -75,10 +107,16 @@ def main():
 	for (
 		account_id,
 		client_login,
+		campaign_id,
+		adgroup_id,
+		criterion_id,
 		ad_network_type,
 		device,
+		location_of_presence_name,
+		targeting_location_name,
 		age,
 		gender,
+		weekday,
 		data_days_recent_7d,
 		data_days_baseline_23d,
 		impressions_recent_7d,
@@ -116,9 +154,23 @@ def main():
 		conv_per_day_recent_7d = float(conv_per_day_recent_7d or 0)
 		conv_per_day_baseline_23d = float(conv_per_day_baseline_23d or 0)
 		
-		segment_key = f"{ad_network_type}|{device}|{age}|{gender}"
+		segment_key = (
+			f"{weekday}|{campaign_id}|{adgroup_id}|{criterion_id}|"
+			f"{location_of_presence_name}|{targeting_location_name}|{device}|{age}|{gender}|{ad_network_type}"
+		)
 		
-		if has_unknown_values(ad_network_type, device, age, gender):
+		if has_unknown_values(
+			campaign_id,
+			adgroup_id,
+			criterion_id,
+			ad_network_type,
+			device,
+			location_of_presence_name,
+			targeting_location_name,
+			age,
+			gender,
+			weekday,
+		):
 			continue
 
 		if data_days_recent_7d < MIN_RECENT_DATA_DAYS:
@@ -156,9 +208,24 @@ def main():
 			)
 			continue
 
-		segment_key = f"{ad_network_type}|{device}|{age}|{gender}"
+		segment_key = (
+			f"{weekday}|{campaign_id}|{adgroup_id}|{criterion_id}|"
+			f"{location_of_presence_name}|{targeting_location_name}|{device}|{age}|{gender}|{ad_network_type}"
+		)
 		cpa_ratio = cpa_recent_7d / cpa_baseline_23d
 		excess_cost = max(0.0, spend_recent_7d - (conversions_recent_7d * cpa_baseline_23d))
+		segment_label = build_segment_label(
+			campaign_id,
+			adgroup_id,
+			criterion_id,
+			device,
+			ad_network_type,
+			location_of_presence_name,
+			targeting_location_name,
+			age,
+			gender,
+			weekday,
+		)
 
 		print(
 			f"Creating SEGMENT_COMBINATION_TREND_BAD for {account_id}: "
@@ -174,8 +241,7 @@ def main():
 			severity=78,
 			impact_rub=excess_cost,
 			title=(
-				f"Segment trend worsened in last 7d: "
-				f"{device}, {age}, {gender}, {ad_network_type}"
+				f"Segment trend worsened in last 7d: {segment_label}"
 			),
 			description=(
 				f"CPA last 7d = {cpa_recent_7d:.0f} ₽, "
@@ -188,10 +254,16 @@ def main():
 			),
 			evidence={
 				"client_login": client_login,
+				"campaign_id": campaign_id,
+				"adgroup_id": adgroup_id,
+				"criterion_id": criterion_id,
 				"ad_network_type": ad_network_type,
 				"device": device,
+				"location_of_presence_name": location_of_presence_name,
+				"targeting_location_name": targeting_location_name,
 				"age": age,
 				"gender": gender,
+				"weekday": weekday,
 				"data_days_recent_7d": data_days_recent_7d,
 				"data_days_baseline_23d": data_days_baseline_23d,
 				"impressions_recent_7d": impressions_recent_7d,
@@ -214,7 +286,7 @@ def main():
 			},
 			confidence=1.0,
 		)
-		
+
 		if data_days_recent_7d < MIN_RECENT_DATA_DAYS:
 			continue
 
@@ -242,9 +314,24 @@ def main():
 		if conv_per_day_recent_7d < conv_per_day_baseline_23d * 0.8:
 			continue
 
-		segment_key = f"{ad_network_type}|{device}|{age}|{gender}"
+		segment_key = (
+			f"{weekday}|{campaign_id}|{adgroup_id}|{criterion_id}|"
+			f"{location_of_presence_name}|{targeting_location_name}|{device}|{age}|{gender}|{ad_network_type}"
+		)
 		cpa_ratio = cpa_recent_7d / cpa_baseline_23d
 		saved_rub = max(0.0, (cpa_baseline_23d - cpa_recent_7d) * conversions_recent_7d)
+		segment_label = build_segment_label(
+			campaign_id,
+			adgroup_id,
+			criterion_id,
+			device,
+			ad_network_type,
+			location_of_presence_name,
+			targeting_location_name,
+			age,
+			gender,
+			weekday,
+		)
 
 		print(
 			f"Creating SEGMENT_COMBINATION_TREND_GOOD for {account_id}: "
@@ -260,8 +347,7 @@ def main():
 			severity=52,
 			impact_rub=saved_rub,
 			title=(
-				f"Segment trend improved in last 7d: "
-				f"{device}, {age}, {gender}, {ad_network_type}"
+				f"Segment trend improved in last 7d: {segment_label}"
 			),
 			description=(
 				f"CPA last 7d = {cpa_recent_7d:.0f} ₽, "
@@ -276,8 +362,13 @@ def main():
 			),
 			evidence={
 				"client_login": client_login,
+				"campaign_id": campaign_id,
+				"adgroup_id": adgroup_id,
+				"criterion_id": criterion_id,
 				"ad_network_type": ad_network_type,
 				"device": device,
+				"location_of_presence_name": location_of_presence_name,
+				"targeting_location_name": targeting_location_name,
 				"age": age,
 				"gender": gender,
 				"data_days_recent_7d": data_days_recent_7d,

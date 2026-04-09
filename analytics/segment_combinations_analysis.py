@@ -35,9 +35,35 @@ def has_unknown_values(*values):
 	for value in values:
 		if value is None:
 			return True
+		if isinstance(value, str) and not value.strip():
+			return True
+		if isinstance(value, (int, float)) and value == 0:
+			return True
 		if str(value).upper() == "UNKNOWN":
 			return True
 	return False
+
+
+def build_segment_label(campaign_id, adgroup_id, criterion_id, device,
+		ad_network_type, location_of_presence_name, targeting_location_name,
+		age, gender, weekday):
+	parts = [
+		f"weekday={weekday}",
+		f"campaign_id={campaign_id}",
+		f"adgroup_id={adgroup_id}",
+		f"criterion_id={criterion_id}",
+	]
+	if location_of_presence_name:
+		parts.append(f"location={location_of_presence_name}")
+	if targeting_location_name:
+		parts.append(f"targeting={targeting_location_name}")
+	parts.extend([
+		f"device={device}",
+		f"age={age}",
+		f"gender={gender}",
+		f"network={ad_network_type}",
+	])
+	return ", ".join(parts)
 
 
 def main():
@@ -48,10 +74,16 @@ def main():
 		SELECT
 			sc.account_id,
 			sc.client_login,
+			sc.campaign_id,
+			sc.adgroup_id,
+			sc.criterion_id,
 			sc.ad_network_type,
 			sc.device,
+			sc.location_of_presence_name,
+			sc.targeting_location_name,
 			sc.age,
 			sc.gender,
+			sc.weekday,
 			SUM(sc.impressions) AS impressions,
 			SUM(sc.clicks) AS clicks,
 			SUM(sc.spend_rub) AS spend_rub,
@@ -68,10 +100,16 @@ def main():
 		GROUP BY
 			sc.account_id,
 			sc.client_login,
+			sc.campaign_id,
+			sc.adgroup_id,
+			sc.criterion_id,
 			sc.ad_network_type,
 			sc.device,
+			sc.location_of_presence_name,
+			sc.targeting_location_name,
 			sc.age,
 			sc.gender,
+			sc.weekday,
 			acc.cpa
 	""")
 
@@ -80,10 +118,16 @@ def main():
 	for (
 		account_id,
 		client_login,
+		campaign_id,
+		adgroup_id,
+		criterion_id,
 		ad_network_type,
 		device,
+		location_of_presence_name,
+		targeting_location_name,
 		age,
 		gender,
+		weekday,
 		impressions,
 		clicks,
 		spend_rub,
@@ -98,7 +142,18 @@ def main():
 		segment_cpa = float(segment_cpa) if segment_cpa is not None else None
 		account_cpa = float(account_cpa) if account_cpa is not None else None
 
-		if has_unknown_values(ad_network_type, device, age, gender):
+		if has_unknown_values(
+			campaign_id,
+			adgroup_id,
+			criterion_id,
+			ad_network_type,
+			device,
+			location_of_presence_name,
+			targeting_location_name,
+			age,
+			gender,
+			weekday,
+		):
 			continue
 
 		if spend_rub < MIN_SPEND_RUB:
@@ -119,8 +174,23 @@ def main():
 		if segment_cpa <= account_cpa * CPA_BAD_MULTIPLIER:
 			continue
 
-		segment_key = f"{ad_network_type}|{device}|{age}|{gender}"
+		segment_key = (
+			f"{weekday}|{campaign_id}|{adgroup_id}|{criterion_id}|"
+			f"{location_of_presence_name}|{targeting_location_name}|{device}|{age}|{gender}|{ad_network_type}"
+		)
 		cpa_ratio = segment_cpa / account_cpa
+		segment_label = build_segment_label(
+			campaign_id,
+			adgroup_id,
+			criterion_id,
+			device,
+			ad_network_type,
+			location_of_presence_name,
+			targeting_location_name,
+			age,
+			gender,
+			weekday,
+		)
 
 		print(
 			f"Creating SEGMENT_COMBINATION_CPA_BAD for {account_id}: "
@@ -137,7 +207,7 @@ def main():
 			impact_rub=max(0.0, spend_rub - (conversions * account_cpa)),
 			title=(
 				f"Segment CPA is {cpa_ratio:.1f}× worse than account average: "
-				f"{device}, {age}, {gender}, {ad_network_type}"
+				f"{segment_label}"
 			),
 			description=(
 				f"Segment CPA = {segment_cpa:.0f} ₽, account CPA = {account_cpa:.0f} ₽, "
@@ -149,10 +219,16 @@ def main():
 			),
 			evidence={
 				"client_login": client_login,
+				"campaign_id": campaign_id,
+				"adgroup_id": adgroup_id,
+				"criterion_id": criterion_id,
 				"ad_network_type": ad_network_type,
 				"device": device,
+				"location_of_presence_name": location_of_presence_name,
+				"targeting_location_name": targeting_location_name,
 				"age": age,
 				"gender": gender,
+				"weekday": weekday,
 				"impressions": impressions,
 				"clicks": clicks,
 				"spend_rub": spend_rub,
@@ -180,9 +256,24 @@ def main():
 		if segment_cpa >= account_cpa * WINNER_CPA_MULTIPLIER:
 			continue
 
-		segment_key = f"{ad_network_type}|{device}|{age}|{gender}"
+		segment_key = (
+			f"{weekday}|{campaign_id}|{adgroup_id}|{criterion_id}|"
+			f"{location_of_presence_name}|{targeting_location_name}|{device}|{age}|{gender}|{ad_network_type}"
+		)
 		cpa_ratio = segment_cpa / account_cpa
 		saved_rub = max(0.0, (account_cpa - segment_cpa) * conversions)
+		segment_label = build_segment_label(
+			campaign_id,
+			adgroup_id,
+			criterion_id,
+			device,
+			ad_network_type,
+			location_of_presence_name,
+			targeting_location_name,
+			age,
+			gender,
+			weekday,
+		)
 
 		print(
 			f"Creating SEGMENT_COMBINATION_WINNER for {account_id}: "
@@ -198,8 +289,7 @@ def main():
 			severity=55,
 			impact_rub=saved_rub,
 			title=(
-				f"Segment outperforms account average: "
-				f"{device}, {age}, {gender}, {ad_network_type}"
+				f"Segment outperforms account average: {segment_label}"
 			),
 			description=(
 				f"Segment CPA = {segment_cpa:.0f} ₽, account CPA = {account_cpa:.0f} ₽, "
@@ -211,10 +301,16 @@ def main():
 			),
 			evidence={
 				"client_login": client_login,
+				"campaign_id": campaign_id,
+				"adgroup_id": adgroup_id,
+				"criterion_id": criterion_id,
 				"ad_network_type": ad_network_type,
 				"device": device,
+				"location_of_presence_name": location_of_presence_name,
+				"targeting_location_name": targeting_location_name,
 				"age": age,
 				"gender": gender,
+				"weekday": weekday,
 				"impressions": impressions,
 				"clicks": clicks,
 				"spend_rub": spend_rub,
@@ -226,7 +322,7 @@ def main():
 				"window_days": 30,
 			},
 			confidence=1.0,
-		)		
+		)
 
 		if clicks < MIN_CLICKS:
 			continue
@@ -234,7 +330,22 @@ def main():
 		if conversions > 0:
 			continue
 
-		segment_key = f"{ad_network_type}|{device}|{age}|{gender}"
+		segment_key = (
+			f"{weekday}|{campaign_id}|{adgroup_id}|{criterion_id}|"
+			f"{location_of_presence_name}|{targeting_location_name}|{device}|{age}|{gender}|{ad_network_type}"
+		)
+		segment_label = build_segment_label(
+			campaign_id,
+			adgroup_id,
+			criterion_id,
+			device,
+			ad_network_type,
+			location_of_presence_name,
+			targeting_location_name,
+			age,
+			gender,
+			weekday,
+		)
 
 		print(
 			f"Creating SEGMENT_COMBINATION_WASTE for {account_id}: "
@@ -248,7 +359,7 @@ def main():
 			entity_id=segment_key,
 			severity=70,
 			impact_rub=spend_rub,
-			title=f"Segment combination wastes budget: {device}, {age}, {gender}, {ad_network_type}",
+			title=f"Segment combination wastes budget: {segment_label}",
 			description=(
 				f"Spent {spend_rub:.0f} ₽ with {clicks} clicks and 0 conversions "
 				f"over the last 30 days"
@@ -259,10 +370,16 @@ def main():
 			),
 			evidence={
 				"client_login": client_login,
+				"campaign_id": campaign_id,
+				"adgroup_id": adgroup_id,
+				"criterion_id": criterion_id,
 				"ad_network_type": ad_network_type,
 				"device": device,
+				"location_of_presence_name": location_of_presence_name,
+				"targeting_location_name": targeting_location_name,
 				"age": age,
 				"gender": gender,
+				"weekday": weekday,
 				"impressions": impressions,
 				"clicks": clicks,
 				"spend_rub": spend_rub,

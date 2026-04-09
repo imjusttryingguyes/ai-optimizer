@@ -28,8 +28,18 @@ def get_insight_types():
 	conn.close()
 	return types
 
+# Get all entity types for filter
+def get_entity_types():
+	conn = get_conn()
+	cur = conn.cursor()
+	cur.execute("SELECT DISTINCT entity_type FROM insights ORDER BY entity_type")
+	entity_types = [row[0] for row in cur.fetchall() if row[0] is not None]
+	cur.close()
+	conn.close()
+	return entity_types
+
 # Get insights with filters
-def get_insights(days=7, insight_type=None, account_id=None, severity_min=0):
+def get_insights(days=7, insight_type=None, account_id=None, severity_min=0, entity_type=None):
 	conn = get_conn()
 	cur = conn.cursor()
 	
@@ -43,11 +53,9 @@ def get_insights(days=7, insight_type=None, account_id=None, severity_min=0):
 	
 	if account_id:
 		where_clauses.append(f"account_id = '{account_id}'")
-	
-	where_sql = " AND ".join(where_clauses)
-	
-	query = f"""
-		SELECT 
+
+	if entity_type:
+		where_clauses.append(f"entity_type = '{entity_type}'")
 			id,
 			account_id,
 			type,
@@ -208,9 +216,11 @@ def insights():
 	insight_type = request.args.get('type', None)
 	account_id = request.args.get('account_id', None)
 	severity_min = request.args.get('severity_min', 0, type=int)
+	entity_type = request.args.get('entity_type', None)
 	
-	data = get_insights(days, insight_type, account_id, severity_min)
+	data = get_insights(days, insight_type, account_id, severity_min, entity_type)
 	insight_types = get_insight_types()
+	entity_types = get_entity_types()
 	
 	insights_list = [{
 		'id': row[0],
@@ -230,8 +240,43 @@ def insights():
 	return render_template('insights.html',
 		insights=insights_list,
 		insight_types=insight_types,
+		entity_types=entity_types,
 		selected_type=insight_type,
+		selected_entity=entity_type,
 		selected_account=account_id,
+		selected_severity=severity_min,
+		days=days
+	)
+
+@app.route('/segment-combinations')
+def segment_combinations():
+	days = request.args.get('days', 30, type=int)
+	severity_min = request.args.get('severity_min', 0, type=int)
+	data = get_insights(days, None, None, severity_min, 'segment_combination')
+	insight_types = get_insight_types()
+	entity_types = get_entity_types()
+	insights_list = [{
+		'id': row[0],
+		'account_id': row[1],
+		'type': row[2],
+		'entity_type': row[3],
+		'entity_id': row[4],
+		'severity': row[5],
+		'impact_rub': float(row[6] or 0),
+		'title': row[7],
+		'description': row[8],
+		'recommendation': row[9],
+		'created_at': row[10].isoformat() if row[10] else None,
+		'date_formatted': row[10].strftime('%Y-%m-%d %H:%M') if row[10] else 'N/A'
+	} for row in data]
+
+	return render_template('insights.html',
+		insights=insights_list,
+		insight_types=insight_types,
+		entity_types=entity_types,
+		selected_type=None,
+		selected_entity='segment_combination',
+		selected_account=None,
 		selected_severity=severity_min,
 		days=days
 	)
