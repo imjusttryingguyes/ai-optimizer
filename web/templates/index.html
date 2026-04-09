@@ -36,7 +36,7 @@
 	<div class="col-md-3">
 		<div class="card stats-card">
 			<div class="card-body">
-				<div class="stat-value">{{ "{:,.0f}".format(stats.total_impact) }} ₽</div>
+				<div class="stat-value">{{ stats.total_impact|thousands }} ₽</div>
 				<div class="stat-label">Сумма воздействия</div>
 			</div>
 		</div>
@@ -44,7 +44,7 @@
 	<div class="col-md-3">
 		<div class="card stats-card">
 			<div class="card-body">
-				<div class="stat-value">{{ "{:.1f}".format(stats.avg_severity) }}</div>
+				<div class="stat-value">{{ stats.avg_severity|decimal1 }}</div>
 				<div class="stat-label">Средний уровень серьезности</div>
 			</div>
 		</div>

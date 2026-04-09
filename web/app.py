@@ -223,7 +223,8 @@ def insights():
 		'title': row[7],
 		'description': row[8],
 		'recommendation': row[9],
-		'created_at': row[10].isoformat() if row[10] else None
+			'created_at': row[10].isoformat() if row[10] else None,
+			'date_formatted': row[10].strftime('%Y-%m-%d %H:%M') if row[10] else 'N/A'
 	} for row in data]
 	
 	return render_template('insights.html',
@@ -293,4 +294,29 @@ def top_accounts():
 	})
 
 if __name__ == '__main__':
+	# Register custom filters
+	@app.template_filter('currency')
+	def currency_filter(value):
+		"""Format number as currency"""
+		try:
+			return f"₽ {int(value):,}".replace(',', ' ')
+		except (ValueError, TypeError):
+			return "₽ 0"
+	
+	@app.template_filter('thousands')
+	def thousands_filter(value):
+		"""Format number with thousands separator"""
+		try:
+			return f"{int(value):,}".replace(',', ' ')
+		except (ValueError, TypeError):
+			return "0"
+	
+	@app.template_filter('decimal1')
+	def decimal1_filter(value):
+		"""Format number with 1 decimal place"""
+		try:
+			return f"{float(value):.1f}"
+		except (ValueError, TypeError):
+			return "0"
+	
 	app.run(debug=True, host='0.0.0.0', port=5000)

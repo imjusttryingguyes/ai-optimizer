@@ -73,24 +73,22 @@
 				{% if insights %}
 					{% for insight in insights %}
 					<tr class="insight-row" data-id="{{ insight.id }}" onclick="showInsightModal({{ insight | tojson }})">
-						<td>
-							<small>{{ insight.created_at | replace('T', ' ') | truncate(19, True, '') }}</small>
-						</td>
-						<td>
-							{% if insight.severity >= 80 %}
-								<span class="badge bg-danger">🔥 {{ insight.severity }}</span>
-							{% elif insight.severity >= 60 %}
-								<span class="badge bg-warning text-dark">🔴 {{ insight.severity }}</span>
-							{% elif insight.severity >= 40 %}
-								<span class="badge bg-info">⚠️ {{ insight.severity }}</span>
-							{% else %}
-								<span class="badge bg-secondary">ℹ️ {{ insight.severity }}</span>
-							{% endif %}
-						</td>
-						<td><strong>{{ insight.account_id }}</strong></td>
-						<td><code>{{ insight.type }}</code></td>
-						<td>{{ insight.title }}</td>
-						<td class="text-end"><strong>{{ "{:,.0f}".format(insight.impact_rub) }}</strong></td>
+					<td>{{ insight.date_formatted }}</td>
+					<td>
+						{% if insight.severity >= 80 %}
+							<span class="badge bg-danger">🔥 {{ insight.severity }}</span>
+						{% elif insight.severity >= 60 %}
+							<span class="badge bg-warning text-dark">🔴 {{ insight.severity }}</span>
+						{% elif insight.severity >= 40 %}
+							<span class="badge bg-info">⚠️ {{ insight.severity }}</span>
+						{% else %}
+							<span class="badge bg-secondary">ℹ️ {{ insight.severity }}</span>
+						{% endif %}
+					</td>
+					<td><strong>{{ insight.account_id }}</strong></td>
+					<td><code>{{ insight.type }}</code></td>
+					<td>{{ insight.title }}</td>
+					<td class="text-end"><strong>{{ insight.impact_rub|currency }}</strong></td>
 					</tr>
 					{% endfor %}
 				{% else %}
