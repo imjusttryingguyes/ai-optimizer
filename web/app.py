@@ -578,5 +578,177 @@ def top_accounts():
 		'avg_severities': [float(row[3] or 0) if row[3] else 0 for row in data]
 	})
 
+# KPI API Endpoints (Phase 1)
+from analytics.kpi_engine import KPICalculationEngine
+from analytics.telegram_notifier import TelegramNotifier
+from analytics.kpi_sync_task import KPIDailySync
+
+@app.route('/api/kpi-status')
+def api_kpi_status():
+	"""Get KPI status and pacing for account"""
+	try:
+		account_id = request.args.get('account_id')
+		if not account_id:
+			return jsonify({"error": "account_id parameter required"}), 400
+		
+		conn = get_conn()
+		engine = KPICalculationEngine(conn)
+		status = engine.calculate_kpi_status(account_id)
+		engine.close()
+		conn.close()
+		
+		return jsonify(status)
+	
+	except Exception as e:
+		return jsonify({"error": str(e)}), 500
+
+@app.route('/api/kpi-plan', methods=['GET', 'POST'])
+def api_kpi_plan():
+	"""Get or create KPI plan"""
+	try:
+		conn = get_conn()
+		cur = conn.cursor()
+		
+		if request.method == 'POST':
+			# Create/update plan
+			data = request.json
+			required_fields = ['account_id', 'year_month', 'budget_rub', 'leads_target', 'cpa_target_rub']
+			
+			if not all(field in data for field in required_fields):
+				return jsonify({"error": f"Missing required fields: {required_fields}"}), 400
+			
+			# Parse year_month (format: YYYY-MM)
+			try:
+				year_month = datetime.strptime(data['year_month'], '%Y-%m').date()
+				month_start = year_month.replace(day=1)
+				month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+			except ValueError:
+				return jsonify({"error": "year_month must be YYYY-MM format"}), 400
+			
+			cur.execute("""
+				INSERT INTO kpi_monthly_plan 
+				(account_id, year_month, month_start, month_end, budget_rub, leads_target, cpa_target_rub, roi_target)
+				VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+				ON CONFLICT (account_id, year_month) DO UPDATE SET
+					budget_rub = EXCLUDED.budget_rub,
+					leads_target = EXCLUDED.leads_target,
+					cpa_target_rub = EXCLUDED.cpa_target_rub,
+					roi_target = EXCLUDED.roi_target,
+					updated_at = NOW()
+				RETURNING id, account_id, year_month, budget_rub, leads_target, cpa_target_rub
+			""", (
+				data['account_id'],
+				month_start,
+				month_start,
+				month_end,
+				float(data['budget_rub']),
+				float(data['leads_target']),
+				float(data['cpa_target_rub']),
+				float(data.get('roi_target', 0)) if data.get('roi_target') else None
+			))
+			
+			conn.commit()
+			row = cur.fetchone()
+			
+			return jsonify({
+				"status": "success",
+				"id": row[0],
+				"account_id": row[1],
+				"year_month": row[2].isoformat(),
+				"budget_rub": float(row[3]),
+				"leads_target": float(row[4]),
+				"cpa_target_rub": float(row[5])
+			}), 201
+		
+		else:
+			# Get plan
+			account_id = request.args.get('account_id')
+			year_month = request.args.get('year_month')
+			
+			if not account_id:
+				return jsonify({"error": "account_id parameter required"}), 400
+			
+			if year_month:
+				# Specific month
+				try:
+					year_month_date = datetime.strptime(year_month, '%Y-%m').date()
+				except ValueError:
+					return jsonify({"error": "year_month must be YYYY-MM format"}), 400
+				
+				cur.execute("""
+					SELECT id, account_id, year_month, budget_rub, leads_target, cpa_target_rub, roi_target
+					FROM kpi_monthly_plan
+					WHERE account_id = %s
+					AND EXTRACT(YEAR FROM year_month) = %s
+					AND EXTRACT(MONTH FROM year_month) = %s
+				""", (account_id, year_month_date.year, year_month_date.month))
+			else:
+				# Current month
+				cur.execute("""
+					SELECT id, account_id, year_month, budget_rub, leads_target, cpa_target_rub, roi_target
+					FROM kpi_monthly_plan
+					WHERE account_id = %s
+					AND EXTRACT(YEAR FROM year_month) = EXTRACT(YEAR FROM NOW())
+					AND EXTRACT(MONTH FROM year_month) = EXTRACT(MONTH FROM NOW())
+					LIMIT 1
+				""", (account_id,))
+			
+			row = cur.fetchone()
+			
+			if row:
+				return jsonify({
+					"id": row[0],
+					"account_id": row[1],
+					"year_month": row[2].isoformat(),
+					"budget_rub": float(row[3]),
+					"leads_target": float(row[4]),
+					"cpa_target_rub": float(row[5]),
+					"roi_target": float(row[6]) if row[6] else None
+				})
+			else:
+				return jsonify({"error": "No KPI plan found"}), 404
+	
+	except Exception as e:
+		return jsonify({"error": str(e)}), 500
+	finally:
+		cur.close()
+		conn.close()
+
+@app.route('/api/kpi-sync', methods=['POST'])
+def api_kpi_sync():
+	"""Manually trigger KPI data sync"""
+	try:
+		yandex_token = os.getenv('YANDEX_API_TOKEN')
+		telegram_token = os.getenv('TELEGRAM_BOT_TOKEN')
+		
+		if not yandex_token:
+			return jsonify({"error": "YANDEX_API_TOKEN not configured"}), 500
+		
+		conn = get_conn()
+		sync_task = KPIDailySync(conn, yandex_token, telegram_token)
+		
+		result = sync_task.sync_all_accounts()
+		conn.close()
+		
+		return jsonify(result)
+	
+	except Exception as e:
+		return jsonify({"error": str(e)}), 500
+
+@app.route('/kpi')
+def kpi_dashboard():
+	"""KPI Dashboard UI (Level 1)"""
+	try:
+		conn = get_conn()
+		cur = conn.cursor()
+		cur.execute("SELECT DISTINCT account_id FROM kpi_monthly_plan ORDER BY account_id")
+		accounts = [row[0] for row in cur.fetchall()]
+		cur.close()
+		conn.close()
+		
+		return render_template('kpi_dashboard.html', accounts=accounts)
+	except Exception as e:
+		return render_template('error.html', error=str(e)), 500
+
 if __name__ == '__main__':
 	app.run(debug=True, host='0.0.0.0', port=5000)
