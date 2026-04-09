@@ -56,6 +56,11 @@ def get_insights(days=7, insight_type=None, account_id=None, severity_min=0, ent
 
 	if entity_type:
 		where_clauses.append(f"entity_type = '{entity_type}'")
+	
+	where_sql = " AND ".join(where_clauses)
+	
+	query = f"""
+		SELECT
 			id,
 			account_id,
 			type,
