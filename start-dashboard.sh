@@ -2,25 +2,27 @@
 # Start AI Optimizer Dashboard
 
 cd /opt/ai-optimizer
-source venv/bin/activate
 
 # Kill existing Flask processes by PID
-for pid in $(ps aux | grep "python.*app.py" | grep -v grep | awk '{print $2}'); do
+for pid in $(ps aux | grep "python.*flask\|python.*app.py" | grep -v grep | awk '{print $2}'); do
     kill $pid 2>/dev/null || true
 done
 sleep 1
 
-# Start Flask
-cd web
-nohup python app.py > /tmp/flask.log 2>&1 &
+# Start Flask (from project root, not from web/ directory)
+nohup python -m flask --app web.app run --host 0.0.0.0 --port 5000 > /tmp/flask.log 2>&1 &
 
 # Wait for startup
 sleep 3
 
 # Check if running
-if ps aux | grep -q "[p]ython app.py"; then
-    echo "✅ Dashboard started (http://localhost:5000)"
-    echo "Flask logs: tail -f /tmp/flask.log"
+if curl -s http://127.0.0.1:5000/ > /dev/null 2>&1; then
+    echo "✅ Dashboard started"
+    echo "   Main dashboard: http://127.0.0.1:5000/"
+    echo "   KPI Dashboard: http://127.0.0.1:5000/kpi"
+    echo "   Insights: http://127.0.0.1:5000/insights"
+    echo ""
+    echo "📝 Logs: tail -f /tmp/flask.log"
 else
     echo "❌ Failed to start dashboard"
     cat /tmp/flask.log
