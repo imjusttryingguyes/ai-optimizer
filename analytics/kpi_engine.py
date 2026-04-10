@@ -90,28 +90,44 @@ class KPICalculationEngine:
         
         cur = self._get_cursor()
         
+        # Get spend and impressions from kpi_daily_summary
         cur.execute("""
             SELECT 
                 SUM(spend_rub)::NUMERIC as total_spend,
-                SUM(clicks)::BIGINT as total_conversions,
                 SUM(impressions)::BIGINT as total_impressions,
                 COUNT(DISTINCT date) as days_data
             FROM kpi_daily_summary
             WHERE account_id = %s
             AND date >= %s
             AND date <= %s
-        """, (account_id, month_start, month_date))  # Only up to today
+        """, (account_id, month_start, month_date))
         
         row = cur.fetchone()
+        total_spend = float(row[0]) if row[0] else 0
+        total_impressions = int(row[1]) if row[1] else 0
+        days_with_data = int(row[2]) if row[2] else 0
+        
+        # Get conversions from direct_daily_goal_conv_fact (actual conversions)
+        cur.execute("""
+            SELECT 
+                SUM(conversions)::BIGINT as total_conversions
+            FROM direct_daily_goal_conv_fact
+            WHERE account_id = %s
+            AND date >= %s
+            AND date <= %s
+        """, (account_id, month_start, month_date))
+        
+        conv_row = cur.fetchone()
+        total_conversions = int(conv_row[0]) if conv_row[0] else 0
         
         return {
             "month_start": month_start,
             "month_end": month_end,
             "period_end": month_date,
-            "total_spend": float(row[0]) if row[0] else 0,
-            "total_conversions": int(row[1]) if row[1] else 0,
-            "total_impressions": int(row[2]) if row[2] else 0,
-            "days_with_data": int(row[3]) if row[3] else 0
+            "total_spend": total_spend,
+            "total_conversions": total_conversions,
+            "total_impressions": total_impressions,
+            "days_with_data": days_with_data
         }
     
     def calculate_kpi_status(self, account_id: str) -> Dict:
