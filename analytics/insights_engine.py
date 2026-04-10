@@ -36,28 +36,28 @@ def get_account_cpa(conn, days: int = 30) -> Decimal:
     Get average CPA for the entire account over last N days.
     
     CPA = Total Spend / Total Conversions
-    If no conversions, CPA = Total Spend (infinite cost per acquisition)
+    If no conversions, CPA = 0 (not analyzable)
     """
     
     cur = conn.cursor()
     
-    # For now, conversions field is empty, so just return spend as CPA
+    # For now, conversions field is empty, so just return 0
+    # When API provides conversion data, this will calculate properly
     cur.execute(f"""
-    SELECT SUM(cost) as total_cost
+    SELECT SUM(cost) as total_cost, COUNT(*) as total_rows
     FROM direct_api_detail
     WHERE date > NOW()::date - INTERVAL '{days} days'
     """)
     
-    total_cost = cur.fetchone()[0]
+    total_cost, total_rows = cur.fetchone()
     
     if total_cost is None or total_cost == 0:
         return Decimal(0)
     
-    # No conversions currently in data, so CPA = total spend
-    cpa = Decimal(str(total_cost))
-    
+    # No conversions currently, return 0 (can't analyze)
+    # This signals that we don't have enough data for analysis
     cur.close()
-    return cpa
+    return Decimal(0)
 
 
 def analyze_segment(conn, segment_name: str, days: int = 30) -> List[Dict[str, Any]]:
@@ -166,6 +166,17 @@ def get_segment_insights(conn, days: int = 30) -> Dict[str, Any]:
     
     account_cpa = get_account_cpa(conn, days)
     
+    # If no conversions, return empty results (can't analyze without conversion data)
+    if account_cpa == 0:
+        return {
+            "account_cpa": 0,
+            "account_spend": 0,
+            "account_conversions": 0,
+            "problems": [],
+            "opportunities": [],
+            "note": "No conversion data available for analysis"
+        }
+    
     # Get account totals
     cur = conn.cursor()
     cur.execute(f"""
@@ -208,8 +219,9 @@ def get_segment_insights(conn, days: int = 30) -> Dict[str, Any]:
                     "severity": severity,
                 })
             
-            # Opportunity: CPA <= 0.5x average
-            elif cpa_ratio <= THRESHOLDS["opportunity"] and cpa_ratio > 0:
+            # Opportunity: CPA <= 0.5x average AND has conversions (not 0)
+            # Don't include segments with 0 conversions in opportunities
+            elif cpa_ratio <= THRESHOLDS["opportunity"] and item["conversions"] > 0:
                 potential = "high" if cpa_ratio <= 0.3 else "medium"
                 opportunities.append({
                     "segment_name": segment_name,

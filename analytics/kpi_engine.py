@@ -107,18 +107,10 @@ class KPICalculationEngine:
         total_impressions = int(row[1]) if row[1] else 0
         days_with_data = int(row[2]) if row[2] else 0
         
-        # Get conversions from direct_daily_goal_conv_fact (actual conversions)
-        cur.execute("""
-            SELECT 
-                SUM(conversions)::BIGINT as total_conversions
-            FROM direct_daily_goal_conv_fact
-            WHERE account_id = %s
-            AND date >= %s
-            AND date <= %s
-        """, (account_id, month_start, month_date))
-        
-        conv_row = cur.fetchone()
-        total_conversions = int(conv_row[0]) if conv_row[0] else 0
+        # Get conversions from direct_api_detail
+        # Note: Yandex API currently returns empty {} for conversions field, so conversions = 0
+        # TODO: When API provides conversion data, update this query
+        total_conversions = 0
         
         return {
             "month_start": month_start,

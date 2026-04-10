@@ -470,13 +470,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     return;
                 }
 
+                // Check if we have conversion data
+                if (data.message) {
+                    content.innerHTML = `<div class="alert" style="margin-top: 20px;">${data.message}</div>`;
+                    return;
+                }
+
                 let html = `
                     <div style="margin-bottom: 20px;">
                         <h3>Статус аккаунта (30 дней)</h3>
                         <div class="metrics">
                             <div class="metric">
                                 <div class="metric-label">Средний CPA</div>
-                                <div class="metric-value">${data.account_cpa.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                                <div class="metric-value">${data.account_cpa > 0 ? data.account_cpa.toLocaleString('ru-RU', {maximumFractionDigits: 0}) + ' ₽' : 'Нет данных'}</div>
                             </div>
                             <div class="metric">
                                 <div class="metric-label">Всего расходов</div>
@@ -618,51 +624,10 @@ def get_insights():
         # Get all insights (problems + opportunities)
         insights = get_segment_insights(conn, days=30)
         
-        # TEMPORARY: Add dummy data for testing UI
-        # Remove when conversions data is available
-        if not insights.get("problems"):
-            insights["problems"] = [
-                {
-                    "segment_name": "Device",
-                    "segment_value": "SMART_TV",
-                    "cpa": 5600,
-                    "cpa_ratio": 3.5,
-                    "spend": 16800,
-                    "conversions": 3,
-                    "severity": "critical"
-                },
-                {
-                    "segment_name": "Age",
-                    "segment_value": "55+",
-                    "cpa": 3700,
-                    "cpa_ratio": 2.1,
-                    "spend": 18500,
-                    "conversions": 5,
-                    "severity": "high"
-                },
-            ]
-        
-        if not insights.get("opportunities"):
-            insights["opportunities"] = [
-                {
-                    "segment_name": "Device",
-                    "segment_value": "MOBILE",
-                    "cpa": 600,
-                    "cpa_ratio": 0.35,
-                    "spend": 30000,
-                    "conversions": 50,
-                    "potential": "high"
-                },
-                {
-                    "segment_name": "AdNetworkType",
-                    "segment_value": "SEARCH",
-                    "cpa": 800,
-                    "cpa_ratio": 0.45,
-                    "spend": 25000,
-                    "conversions": 31,
-                    "potential": "medium"
-                },
-            ]
+        # No dummy data anymore - show message if no real data available
+        if insights.get("note"):
+            # No conversion data, add informative message
+            insights["message"] = "📊 Инсайты будут доступны когда поступят данные о конверсиях из API Яндекс.Директа"
         
         conn.close()
         
@@ -671,31 +636,12 @@ def get_insights():
         print(f"Error getting insights: {e}")
         return {
             "error": str(e),
-            "account_cpa": 1750,
-            "account_spend": 125000,
-            "account_conversions": 71,
-            "problems": [
-                {
-                    "segment_name": "Device",
-                    "segment_value": "SMART_TV",
-                    "cpa": 5600,
-                    "cpa_ratio": 3.5,
-                    "spend": 16800,
-                    "conversions": 3,
-                    "severity": "critical"
-                },
-            ],
-            "opportunities": [
-                {
-                    "segment_name": "Device",
-                    "segment_value": "MOBILE",
-                    "cpa": 600,
-                    "cpa_ratio": 0.35,
-                    "spend": 30000,
-                    "conversions": 50,
-                    "potential": "high"
-                },
-            ]
+            "account_cpa": 0,
+            "account_spend": 0,
+            "account_conversions": 0,
+            "problems": [],
+            "opportunities": [],
+            "message": "❌ Ошибка при получении инсайтов"
         }
 
 def get_segment_drill_down(segment_name, segment_value, is_problem=True):
