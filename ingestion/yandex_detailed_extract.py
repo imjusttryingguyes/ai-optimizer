@@ -38,10 +38,11 @@ CONFIG = {
 
 
 def get_last_30_days():
-    """Get date range for last 30 days"""
+    """Get date range for last 30 days (excluding today)"""
     today = datetime.now().date()
     date_from = today - timedelta(days=30)
-    return date_from.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
+    date_to = today - timedelta(days=1)  # Exclude today
+    return date_from.strftime("%Y-%m-%d"), date_to.strftime("%Y-%m-%d")
 
 
 def get_yesterday():
@@ -49,6 +50,32 @@ def get_yesterday():
     today = datetime.now().date()
     yesterday = today - timedelta(days=1)
     return yesterday.strftime("%Y-%m-%d"), yesterday.strftime("%Y-%m-%d")
+
+
+def split_date_range(date_from: str, date_to: str, max_days: int = 7) -> list:
+    """
+    Split a large date range into smaller chunks to avoid API row limits.
+    
+    Yandex Direct API returns max 500K rows per request, so we split
+    large date ranges into weekly chunks.
+    
+    Returns list of (date_from, date_to) tuples
+    """
+    from_dt = datetime.strptime(date_from, "%Y-%m-%d").date()
+    to_dt = datetime.strptime(date_to, "%Y-%m-%d").date()
+    
+    ranges = []
+    current = from_dt
+    
+    while current <= to_dt:
+        range_end = min(current + timedelta(days=max_days - 1), to_dt)
+        ranges.append((
+            current.strftime("%Y-%m-%d"),
+            range_end.strftime("%Y-%m-%d")
+        ))
+        current = range_end + timedelta(days=1)
+    
+    return ranges
 
 
 def fetch_detailed_report(
@@ -114,6 +141,10 @@ def fetch_detailed_report(
             "Impressions",
             "Clicks",
             "Cost",
+            
+            # Conversions: When Goals is set, API will return Conversions_<goal_id>_<model> for each goal
+            # Just include "Conversions" in field list and API handles the expansion
+            "Conversions",
             
             # Dimensions - Device and Demographics
             "Device",
@@ -276,107 +307,204 @@ def parse_detailed_report(tsv_text: str, goal_ids: list, report_type: str = "CUS
 
 def df_to_api_detail_records(df: pd.DataFrame, conversion_data: dict) -> list:
     """
-    Convert DataFrame rows to direct_api_detail table records
+    Convert DataFrame rows to direct_api_detail table records (optimized for large datasets)
     
-    Returns list of dicts ready for INSERT (with deduplication)
+    If there are duplicate rows (by dedup key), aggregate their metrics and conversions
+    Returns list of dicts ready for INSERT
+    
+    Uses itertuples instead of iterrows for 10x faster performance on 2M+ rows
     """
     
-    records = []
-    seen_keys = set()  # For deduplication
+    records_dict = {}  # dedup_key -> record dict (for aggregation)
     
-    for _, row in df.iterrows():
+    # Helper function for value extraction
+    def get_val(val, default=None, as_int=False, as_float=False):
+        if pd.isna(val) or val is None or val == "" or val == "--":
+            return default
+        try:
+            if as_int:
+                return int(val)
+            if as_float:
+                return float(val)
+            return val
+        except (ValueError, TypeError):
+            return default
+    
+    # Build conversion column indices for faster access
+    conv_col_indices = {}
+    for goal_id, models in conversion_data.items():
+        for model, col in models.items():
+            if col in df.columns:
+                conv_col_indices[(goal_id, model)] = df.columns.get_loc(col)
+    
+    # Build all column indices, handle missing columns
+    col_indices = {col: idx for idx, col in enumerate(df.columns)}
+    
+    def get_col_idx(col_name):
+        return col_indices.get(col_name)
+    
+    processed = 0
+    for row in df.itertuples(index=False):
         # Build conversions JSONB
         conversions_json = {}
-        for goal_id, models in conversion_data.items():
-            goal_conversions = {}
-            for model, col in models.items():
-                if col in row.index:
-                    conv_val = row[col]
-                    if pd.notna(conv_val) and conv_val > 0:
-                        goal_conversions[model] = int(conv_val)
-            if goal_conversions:
-                conversions_json[str(goal_id)] = goal_conversions
+        for (goal_id, model), col_idx in conv_col_indices.items():
+            conv_val = row[col_idx]
+            if pd.notna(conv_val) and conv_val > 0:
+                goal_str = str(goal_id)
+                if goal_str not in conversions_json:
+                    conversions_json[goal_str] = {}
+                conversions_json[goal_str][model] = int(conv_val)
         
-        # Handle NaN/None/dashes values
-        def get_val(key, default=None, as_int=False, as_float=False):
-            val = row.get(key)
-            if pd.isna(val) or val is None or val == "" or val == "--":
-                return default
-            try:
-                if as_int:
-                    return int(val)
-                if as_float:
-                    return float(val)
-                return val
-            except (ValueError, TypeError):
-                return default
+        # Extract row values - handle missing columns gracefully
+        idx = get_col_idx("Date")
+        date = get_val(row[idx]) if idx is not None else None
         
-        date = get_val("Date")
-        client_login = get_val("ClientLogin")
-        campaign_id = get_val("CampaignId", as_int=True)
-        ad_group_id = get_val("AdGroupId", as_int=True)
-        criterion_id = get_val("CriterionId", as_int=True)
-        device = get_val("Device")
-        gender = get_val("Gender")
-        age = get_val("Age")
-        placement = get_val("Placement")
-        ad_format = get_val("AdFormat")
+        idx = get_col_idx("ClientLogin")
+        client_login = get_val(row[idx]) if idx is not None else None
+        
+        idx = get_col_idx("CampaignId")
+        campaign_id = get_val(row[idx], as_int=True) if idx is not None else None
+        
+        idx = get_col_idx("AdGroupId")
+        ad_group_id = get_val(row[idx], as_int=True) if idx is not None else None
+        
+        idx = get_col_idx("CriterionId")
+        criterion_id = get_val(row[idx], as_int=True) if idx is not None else None
+        
+        idx = get_col_idx("Device")
+        device = get_val(row[idx]) if idx is not None else None
+        
+        idx = get_col_idx("Gender")
+        gender = get_val(row[idx]) if idx is not None else None
+        
+        idx = get_col_idx("Age")
+        age = get_val(row[idx]) if idx is not None else None
+        
+        idx = get_col_idx("Placement")
+        placement = get_val(row[idx]) if idx is not None else None
+        
+        idx = get_col_idx("AdFormat")
+        ad_format = get_val(row[idx]) if idx is not None else None
         
         # Create dedup key (same as UNIQUE constraint)
         dedup_key = (date, client_login, campaign_id, ad_group_id, criterion_id, device, gender, age, placement, ad_format)
         
-        if dedup_key in seen_keys:
-            continue  # Skip duplicate
+        idx = get_col_idx("Impressions")
+        impressions = get_val(row[idx], default=0, as_int=True) if idx is not None else 0
         
-        seen_keys.add(dedup_key)
+        idx = get_col_idx("Clicks")
+        clicks = get_val(row[idx], default=0, as_int=True) if idx is not None else 0
         
-        record = {
-            "date": date,
-            "client_login": client_login,
-            
-            # Campaign
-            "campaign_id": campaign_id,
-            "campaign_type": get_val("CampaignType"),
-            "ad_group_id": ad_group_id,
-            
-            # Criteria
-            "criterion_id": criterion_id,
-            "criterion_type": get_val("CriterionType"),
-            "query": get_val("Query"),
-            
-            # Metrics
-            "impressions": get_val("Impressions", default=0, as_int=True),
-            "clicks": get_val("Clicks", default=0, as_int=True),
-            "cost": float(get_val("cost_rub", default=0)),
-            
-            # Conversions
-            "conversions": json.dumps(conversions_json) if conversions_json else "{}",
-            
-            # Dimensions
-            "device": device,
-            "gender": gender,
-            "age": age,
-            
-            # Placement
-            "ad_network_type": get_val("AdNetworkType"),
-            "ad_format": ad_format,
-            "placement": placement,
-            "income_grade": get_val("IncomeGrade"),
-            
-            # Targeting
-            "targeting_category": get_val("TargetingCategory"),
-            "targeting_location_id": get_val("TargetingLocationId", as_int=True),
-            
-            # Position (handle dashes)
-            "avg_click_position": get_val("AvgClickPosition", as_float=True),
-            "avg_impression_position": get_val("AvgImpressionPosition", as_float=True),
-            "slot": get_val("Slot"),
-            "avg_traffic_volume": get_val("AvgTrafficVolume", as_int=True),
-            "bounces": get_val("Bounces", as_int=True),
-        }
+        idx = get_col_idx("cost_rub")
+        cost = float(get_val(row[idx], default=0)) if idx is not None else 0.0
         
-        records.append(record)
+        if dedup_key in records_dict:
+            # Aggregate metrics with existing record
+            existing = records_dict[dedup_key]
+            existing["impressions"] = (existing.get("impressions", 0) or 0) + (impressions or 0)
+            existing["clicks"] = (existing.get("clicks", 0) or 0) + (clicks or 0)
+            existing["cost"] = (existing.get("cost", 0.0) or 0.0) + cost
+            
+            # Merge conversions
+            existing_conv = json.loads(existing.get("conversions", "{}"))
+            for goal_id, values in conversions_json.items():
+                if goal_id not in existing_conv:
+                    existing_conv[goal_id] = {}
+                for model, conv_count in values.items():
+                    existing_conv[goal_id][model] = existing_conv[goal_id].get(model, 0) + conv_count
+            existing["conversions"] = json.dumps(existing_conv)
+        else:
+            # Create new record
+            idx = get_col_idx("CampaignType")
+            campaign_type = get_val(row[idx]) if idx is not None else None
+            
+            idx = get_col_idx("CriterionType")
+            criterion_type = get_val(row[idx]) if idx is not None else None
+            
+            idx = get_col_idx("Query")
+            query = get_val(row[idx]) if idx is not None else None
+            
+            idx = get_col_idx("AdNetworkType")
+            ad_network_type = get_val(row[idx]) if idx is not None else None
+            
+            idx = get_col_idx("IncomeGrade")
+            income_grade = get_val(row[idx]) if idx is not None else None
+            
+            idx = get_col_idx("TargetingCategory")
+            targeting_category = get_val(row[idx]) if idx is not None else None
+            
+            idx = get_col_idx("TargetingLocationId")
+            targeting_location_id = get_val(row[idx], as_int=True) if idx is not None else None
+            
+            idx = get_col_idx("AvgClickPosition")
+            avg_click_position = get_val(row[idx], as_float=True) if idx is not None else None
+            
+            idx = get_col_idx("AvgImpressionPosition")
+            avg_impression_position = get_val(row[idx], as_float=True) if idx is not None else None
+            
+            idx = get_col_idx("Slot")
+            slot = get_val(row[idx]) if idx is not None else None
+            
+            idx = get_col_idx("AvgTrafficVolume")
+            avg_traffic_volume = get_val(row[idx], as_int=True) if idx is not None else None
+            
+            idx = get_col_idx("Bounces")
+            bounces = get_val(row[idx], as_int=True) if idx is not None else None
+            
+            record = {
+                "date": date,
+                "client_login": client_login,
+                
+                # Campaign
+                "campaign_id": campaign_id,
+                "campaign_type": campaign_type,
+                "ad_group_id": ad_group_id,
+                
+                # Criteria
+                "criterion_id": criterion_id,
+                "criterion_type": criterion_type,
+                "query": query,
+                
+                # Metrics
+                "impressions": impressions,
+                "clicks": clicks,
+                "cost": cost,
+                
+                # Conversions
+                "conversions": json.dumps(conversions_json) if conversions_json else "{}",
+                
+                # Dimensions
+                "device": device,
+                "gender": gender,
+                "age": age,
+                
+                # Placement
+                "ad_network_type": ad_network_type,
+                "ad_format": ad_format,
+                "placement": placement,
+                "income_grade": income_grade,
+                
+                # Targeting
+                "targeting_category": targeting_category,
+                "targeting_location_id": targeting_location_id,
+                
+                # Position (handle dashes)
+                "avg_click_position": avg_click_position,
+                "avg_impression_position": avg_impression_position,
+                "slot": slot,
+                "avg_traffic_volume": avg_traffic_volume,
+                "bounces": bounces,
+            }
+            
+            records_dict[dedup_key] = record
+        
+        processed += 1
+        if processed % 100000 == 0:
+            print(f"  Processed {processed:,} rows, {len(records_dict):,} unique records so far...")
     
+    # Convert dict values to list
+    records = list(records_dict.values())
+    print(f"  ✅ Processed all {processed:,} rows -> {len(records):,} final records")
     return records
 
 
@@ -465,11 +593,17 @@ def insert_api_detail_records(records: list, batch_size: int = 5000) -> int:
 
 def extract_data(mode: str = "daily"):
     """
-    Main extraction: fetch and load detailed data
+    Main extraction: fetch and load detailed data WITH conversions
     
     Modes:
-    - "daily": Yesterday only (fast, ~30 sec)
-    - "full": Last 30 days (slow, ~5-10 min, used monthly)
+    - "daily": Yesterday only (fast)
+    - "full": Last 30 days (slow, splits into weekly chunks to avoid API row limits)
+    
+    Process:
+    1. Split date range into chunks (API returns max 500K rows)
+    2. Fetch CUSTOM_REPORT for each chunk
+    3. Aggregate all data
+    4. Parse and save to database
     """
     
     if mode == "daily":
@@ -477,7 +611,7 @@ def extract_data(mode: str = "daily"):
         print(f"\n📅 Mode: DAILY (yesterday only)")
     elif mode == "full":
         date_from, date_to = get_last_30_days()
-        print(f"\n📅 Mode: FULL (last 30 days)")
+        print(f"\n📅 Mode: FULL (last 30 days, excluding today)")
     else:
         raise ValueError(f"Unknown mode: {mode}")
     
@@ -498,43 +632,84 @@ def extract_data(mode: str = "daily"):
         except Exception as e:
             print(f"⚠️  Could not clear old data: {e}")
     
-    print(f"\n{'='*60}")
+    print(f"\n{'='*70}")
     print(f"Extracting detailed data: {date_from} to {date_to}")
-    print(f"{'='*60}\n")
+    print(f"{'='*70}\n")
     
-    # Step 1: Fetch CUSTOM_REPORT (all dimensions except Query)
-    print("STEP 1: Fetching CUSTOM_REPORT (device, age, gender, placement, etc.)")
-    print("-" * 60)
+    # Split date range into chunks to avoid API row limit (500K per request)
+    date_ranges = split_date_range(date_from, date_to, max_days=7)
+    print(f"STEP 1: Fetching CUSTOM_REPORT")
+    print(f"        Splitting into {len(date_ranges)} requests (7-day chunks)")
+    print(f"        Goals: {len(CONFIG['goal_ids'])} conversion targets")
+    print(f"        Attribution Models: {CONFIG['attribution_models']}")
+    print("-" * 70)
     
-    tsv_content = fetch_detailed_report(
-        token=CONFIG["token"],
-        client_login=CONFIG["client_login"],
-        date_from=date_from,
-        date_to=date_to,
-        goal_ids=CONFIG["goal_ids"],
-        attribution_models=CONFIG["attribution_models"],
-        use_sandbox=CONFIG["use_sandbox"],
-        max_retries=CONFIG["max_retries"],
-        retry_sleep_seconds=CONFIG["retry_sleep_seconds"],
-        report_type="CUSTOM_REPORT",
-    )
+    # Fetch all chunks
+    all_dfs = []
+    total_rows = 0
     
-    # Parse report
-    df_custom, conversion_data = parse_detailed_report(tsv_content, CONFIG["goal_ids"], "CUSTOM_REPORT")
+    for idx, (chunk_from, chunk_to) in enumerate(date_ranges, 1):
+        print(f"\n[{idx}/{len(date_ranges)}] Fetching {chunk_from} to {chunk_to}...")
+        
+        tsv_data = fetch_detailed_report(
+            token=CONFIG["token"],
+            client_login=CONFIG["client_login"],
+            date_from=chunk_from,
+            date_to=chunk_to,
+            goal_ids=CONFIG["goal_ids"],
+            attribution_models=CONFIG["attribution_models"],
+            use_sandbox=CONFIG["use_sandbox"],
+            max_retries=CONFIG["max_retries"],
+            retry_sleep_seconds=CONFIG["retry_sleep_seconds"],
+            report_type="CUSTOM_REPORT",
+        )
+        
+        df, conversion_columns = parse_detailed_report(tsv_data, CONFIG["goal_ids"], "CUSTOM_REPORT")
+        
+        if df.empty:
+            print(f"  ⚠️  No data for this chunk")
+        else:
+            print(f"  ✅ Loaded {len(df)} rows")
+            all_dfs.append(df)
+            total_rows += len(df)
     
-    if df_custom.empty:
-        print("No data in CUSTOM_REPORT!")
-        inserted_total = 0
-    else:
-        # Convert to records and insert
-        records = df_to_api_detail_records(df_custom, conversion_data)
-        print(f"Prepared {len(records)} records for insertion")
-        inserted_total = insert_api_detail_records(records)
-        print(f"✅ Inserted {inserted_total} rows into direct_api_detail\n")
+    if not all_dfs:
+        print("❌ No data received from any API call!")
+        return 0
     
-    print(f"{'='*60}")
+    # Combine all DataFrames
+    print(f"\n✅ Combining {len(all_dfs)} chunks...")
+    df = pd.concat(all_dfs, ignore_index=True)
+    print(f"   Total rows: {len(df)}")
+    
+    # Check for conversions in response
+    conv_cols = [col for col in df.columns if col.startswith('Conversions_')]
+    if conv_cols:
+        print(f"   Conversions columns found: {len(conv_cols)}")
+    
+    # ========== STEP 2: Parse and save ==========
+    print("\nSTEP 2: Converting to database records and inserting")
+    print("-" * 70)
+    
+    # Build conversion_data dict (needed for aggregation)
+    conversion_data = {}
+    for goal_id in CONFIG["goal_ids"]:
+        conversion_data[goal_id] = {}
+        for model in CONFIG["attribution_models"]:
+            col = f"Conversions_{goal_id}_{model}"
+            if col in df.columns:
+                conversion_data[goal_id][model] = col
+    
+    # Convert to records (with aggregation for duplicate keys)
+    records = df_to_api_detail_records(df, conversion_data)
+    print(f"Prepared {len(records)} unique records (after deduplication/aggregation)")
+    
+    inserted_total = insert_api_detail_records(records)
+    print(f"✅ Inserted {inserted_total} rows into direct_api_detail\n")
+    
+    print(f"{'='*70}")
     print(f"✅ COMPLETED: {inserted_total} total rows in direct_api_detail")
-    print(f"{'='*60}\n")
+    print(f"{'='*70}\n")
     
     return inserted_total
 

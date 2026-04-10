@@ -90,7 +90,7 @@ class KPICalculationEngine:
         
         cur = self._get_cursor()
         
-        # Get spend and impressions from kpi_daily_summary
+        # Get spend and impressions from kpi_daily_summary for current month
         cur.execute("""
             SELECT 
                 SUM(spend_rub)::NUMERIC as total_spend,
@@ -106,6 +106,31 @@ class KPICalculationEngine:
         total_spend = float(row[0]) if row[0] else 0
         total_impressions = int(row[1]) if row[1] else 0
         days_with_data = int(row[2]) if row[2] else 0
+        
+        # If no data for current month, try last 30 days
+        if days_with_data == 0:
+            thirty_days_ago = month_date - timedelta(days=30)
+            cur.execute("""
+                SELECT 
+                    SUM(spend_rub)::NUMERIC as total_spend,
+                    SUM(impressions)::BIGINT as total_impressions,
+                    COUNT(DISTINCT date) as days_data,
+                    MIN(date) as actual_start,
+                    MAX(date) as actual_end
+                FROM kpi_daily_summary
+                WHERE account_id = %s
+                AND date >= %s
+                AND date <= %s
+            """, (account_id, thirty_days_ago, month_date))
+            
+            row = cur.fetchone()
+            if row[2] > 0:  # Has data in last 30 days
+                total_spend = float(row[0]) if row[0] else 0
+                total_impressions = int(row[1]) if row[1] else 0
+                days_with_data = int(row[2]) if row[2] else 0
+                # Update date range to actual data range
+                month_start = row[3]
+                month_end = row[4]
         
         # Get conversions from direct_api_detail
         # Note: Yandex API currently returns empty {} for conversions field, so conversions = 0

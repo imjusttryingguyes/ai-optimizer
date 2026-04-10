@@ -462,7 +462,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             content.innerHTML = '<div class="loading">Загружаем инсайты...</div>';
 
             try {
-                const resp = await fetch('/api/insights');
+                const resp = await fetch(`/api/insights?account=${encodeURIComponent(account)}`);
                 const data = await resp.json();
 
                 if (data.error) {
@@ -559,7 +559,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         async function showCampaigns(segmentName, segmentValue, isProblem) {
             try {
-                const resp = await fetch(`/api/insights/segment/${segmentName}/${encodeURIComponent(segmentValue)}?is_problem=${isProblem}`);
+                const account = document.getElementById('account').value;
+                const resp = await fetch(`/api/insights/segment/${segmentName}/${encodeURIComponent(segmentValue)}?account=${encodeURIComponent(account)}&is_problem=${isProblem}`);
                 const data = await resp.json();
 
                 const title = isProblem ? 'Кампании с наихудшей СРА' : 'Лучшие кампании';
@@ -616,13 +617,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 # Insights API functions
-def get_insights():
+def get_insights(client_login=None):
     """Get account-level insights with problems and opportunities"""
     try:
+        print(f"[INSIGHTS] Fetching insights for {client_login}...")
         conn = get_db_connection()
         
+        # If client_login not provided, use default
+        if not client_login:
+            client_login = 'mmg-sz'
+        
+        print(f"[INSIGHTS] Calling get_segment_insights...")
         # Get all insights (problems + opportunities)
-        insights = get_segment_insights(conn, days=30)
+        insights = get_segment_insights(conn, client_login, days=30)
+        print(f"[INSIGHTS] Got insights, closing connection...")
         
         # No dummy data anymore - show message if no real data available
         if insights.get("note"):
@@ -630,10 +638,13 @@ def get_insights():
             insights["message"] = "📊 Инсайты будут доступны когда поступят данные о конверсиях из API Яндекс.Директа"
         
         conn.close()
+        print(f"[INSIGHTS] Done")
         
         return insights
     except Exception as e:
-        print(f"Error getting insights: {e}")
+        print(f"[INSIGHTS] Error getting insights: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "error": str(e),
             "account_cpa": 0,
@@ -644,28 +655,15 @@ def get_insights():
             "message": "❌ Ошибка при получении инсайтов"
         }
 
-def get_segment_drill_down(segment_name, segment_value, is_problem=True):
+def get_segment_drill_down(client_login, segment_name, segment_value, is_problem=True):
     """Get top 3 campaigns for a segment (worst CPA for problems, best for opportunities)"""
     try:
+        print(f"[DRILL] Segment: {segment_name}={segment_value}, is_problem={is_problem}")
         conn = get_db_connection()
         # is_problem=True means show_worst=True (worst CPA first)
-        campaigns = get_segment_campaigns(conn, segment_name, segment_value, limit=3, show_worst=is_problem)
+        campaigns = get_segment_campaigns(conn, client_login, segment_name, segment_value, limit=3, show_worst=is_problem)
+        print(f"[DRILL] Got {len(campaigns)} campaigns")
         conn.close()
-        
-        # TEMPORARY: Add dummy data if no real data
-        if not campaigns:
-            if is_problem:
-                campaigns = [
-                    {"campaign_id": 38926424, "spend": 5600, "conversions": 1, "cpa": 5600, "clicks": 12},
-                    {"campaign_id": 38926425, "spend": 4200, "conversions": 1, "cpa": 4200, "clicks": 8},
-                    {"campaign_id": 38926426, "spend": 7000, "conversions": 1, "cpa": 7000, "clicks": 15},
-                ]
-            else:
-                campaigns = [
-                    {"campaign_id": 38926427, "spend": 12000, "conversions": 25, "cpa": 480, "clicks": 145},
-                    {"campaign_id": 38926428, "spend": 10000, "conversions": 18, "cpa": 556, "clicks": 110},
-                    {"campaign_id": 38926429, "spend": 8000, "conversions": 14, "cpa": 571, "clicks": 95},
-                ]
         
         return {
             "segment_name": segment_name,
@@ -674,7 +672,9 @@ def get_segment_drill_down(segment_name, segment_value, is_problem=True):
             "campaigns": campaigns
         }
     except Exception as e:
-        print(f"Error getting segment campaigns: {e}")
+        print(f"[DRILL] Error getting segment campaigns: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "error": str(e),
             "campaigns": []
@@ -712,22 +712,25 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(plan, cls=DateTimeEncoder).encode())
         
-        elif self.path == '/api/insights':
-            insights = get_insights()
+        elif self.path.startswith('/api/insights?'):
+            account = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('account', [''])[0]
+            insights = get_insights(account)
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps(insights, cls=DateTimeEncoder).encode())
         
         elif self.path.startswith('/api/insights/segment/'):
-            # Parse: /api/insights/segment/{segment_name}/{segment_value}?is_problem={bool}
+            # Parse: /api/insights/segment/{segment_name}/{segment_value}?account={account}&is_problem={bool}
             path_parts = self.path.split('/')
             if len(path_parts) >= 5:
                 segment_name = path_parts[4]
                 segment_value = urllib.parse.unquote(path_parts[5].split('?')[0])
-                is_problem = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('is_problem', ['true'])[0].lower() == 'true'
+                query_params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                account = query_params.get('account', [''])[0]
+                is_problem = query_params.get('is_problem', ['true'])[0].lower() == 'true'
                 
-                campaigns = get_segment_drill_down(segment_name, segment_value, is_problem)
+                campaigns = get_segment_drill_down(account, segment_name, segment_value, is_problem)
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()

@@ -31,36 +31,59 @@ THRESHOLDS = {
 }
 
 
-def get_account_cpa(conn, days: int = 30) -> Decimal:
+def get_account_cpa(conn, client_login: str, days: int = 30) -> Decimal:
     """
     Get average CPA for the entire account over last N days.
     
     CPA = Total Spend / Total Conversions
-    If no conversions, CPA = 0 (not analyzable)
     """
     
     cur = conn.cursor()
     
-    # For now, conversions field is empty, so just return 0
-    # When API provides conversion data, this will calculate properly
+    # Get account metrics - total spend and total conversions
     cur.execute(f"""
-    SELECT SUM(cost) as total_cost, COUNT(*) as total_rows
+    SELECT SUM(cost) as total_cost
     FROM direct_api_detail
-    WHERE date > NOW()::date - INTERVAL '{days} days'
-    """)
+    WHERE date >= NOW()::date - INTERVAL '{days} days'
+        AND client_login = %s
+    """, (client_login,))
     
-    total_cost, total_rows = cur.fetchone()
+    total_cost = cur.fetchone()[0]
     
     if total_cost is None or total_cost == 0:
         return Decimal(0)
     
-    # No conversions currently, return 0 (can't analyze)
-    # This signals that we don't have enough data for analysis
+    # Calculate total conversions from JSONB field
+    cur.execute(f"""
+    SELECT conversions
+    FROM direct_api_detail
+    WHERE date >= NOW()::date - INTERVAL '{days} days'
+        AND client_login = %s
+        AND conversions != '{{}}'
+    """, (client_login,))
+    
+    total_conversions = 0
+    for row in cur.fetchall():
+        conv_data = row[0]
+        if conv_data:
+            for goal_id, models in conv_data.items():
+                if isinstance(models, dict) and 'AUTO' in models:
+                    conv_count = models.get('AUTO', 0)
+                    if isinstance(conv_count, (int, float)):
+                        total_conversions += conv_count
+    
     cur.close()
-    return Decimal(0)
+    
+    # If no conversions, return 0 (invalid CPA)
+    if total_conversions == 0:
+        return Decimal(0)
+    
+    # CPA = Total Spend / Total Conversions
+    cpa = Decimal(str(total_cost)) / Decimal(str(total_conversions))
+    return cpa
 
 
-def analyze_segment(conn, segment_name: str, days: int = 30) -> List[Dict[str, Any]]:
+def analyze_segment(conn, client_login: str, segment_name: str, days: int = 30) -> List[Dict[str, Any]]:
     """
     Analyze a single segment (e.g., Device, Age, AdFormat).
     
@@ -85,7 +108,7 @@ def analyze_segment(conn, segment_name: str, days: int = 30) -> List[Dict[str, A
     
     col = column_map.get(segment_name, segment_name.lower())
     
-    # Query: Group by segment, sum metrics, calculate CPA
+    # Query: Group by segment, sum metrics, and aggregate conversions from JSONB
     sql = f"""
     SELECT 
         COALESCE({col}, 'N/A') as segment_value,
@@ -93,22 +116,32 @@ def analyze_segment(conn, segment_name: str, days: int = 30) -> List[Dict[str, A
         SUM(impressions) as impressions,
         SUM(cost) as spend,
         COUNT(DISTINCT campaign_id) as campaign_count,
-        COUNT(*) as detail_rows
+        COUNT(*) as detail_rows,
+        array_agg(conversions) FILTER (WHERE conversions != '{{}}'::jsonb) as conversion_jsons
     FROM direct_api_detail
-    WHERE date > NOW()::date - INTERVAL '{days} days'
+    WHERE date >= NOW()::date - INTERVAL '{days} days'
         AND {col} IS NOT NULL
+        AND client_login = %s
     GROUP BY {col}
     ORDER BY spend DESC
     """
     
-    cur.execute(sql)
+    cur.execute(sql, (client_login,))
     results = []
     
     for row in cur.fetchall():
-        segment_value, clicks, impressions, spend, campaign_count, detail_rows = row
+        segment_value, clicks, impressions, spend, campaign_count, detail_rows, conv_jsons = row
         
-        # For now, conversions are empty, so assume 0
+        # Sum conversions from JSONB array
         conversions = 0
+        if conv_jsons:
+            for conv_json in conv_jsons:
+                if conv_json:
+                    for goal_id, models in conv_json.items():
+                        if isinstance(models, dict) and 'AUTO' in models:
+                            conv_count = models.get('AUTO', 0)
+                            if isinstance(conv_count, (int, float)):
+                                conversions += conv_count
         
         # Calculate CPA
         if conversions > 0:
@@ -130,43 +163,16 @@ def analyze_segment(conn, segment_name: str, days: int = 30) -> List[Dict[str, A
     return results
 
 
-def get_segment_insights(conn, days: int = 30) -> Dict[str, Any]:
+def get_segment_insights(conn, client_login: str, days: int = 30) -> Dict[str, Any]:
     """
     Analyze all segments and identify problems and opportunities.
     
-    Returns:
-    {
-        "account_cpa": 1234.56,
-        "account_spend": 141619.32,
-        "account_conversions": 115,
-        "problems": [
-            {
-                "segment_name": "Age",
-                "segment_value": "55+",
-                "cpa": 3700.50,
-                "cpa_ratio": 3.0,
-                "spend": 18500.00,
-                "conversions": 5,
-                "severity": "high"
-            }
-        ],
-        "opportunities": [
-            {
-                "segment_name": "Device",
-                "segment_value": "TABLET",
-                "cpa": 456.00,
-                "cpa_ratio": 0.37,
-                "spend": 3807.00,
-                "conversions": 8,
-                "potential": "medium"
-            }
-        ]
-    }
+    Uses single efficient SQL query with UNIONs instead of 11 separate queries.
     """
     
-    account_cpa = get_account_cpa(conn, days)
+    account_cpa = get_account_cpa(conn, client_login, days)
     
-    # If no conversions, return empty results (can't analyze without conversion data)
+    # If we have no data at all, return empty results
     if account_cpa == 0:
         return {
             "account_cpa": 0,
@@ -174,66 +180,142 @@ def get_segment_insights(conn, days: int = 30) -> Dict[str, Any]:
             "account_conversions": 0,
             "problems": [],
             "opportunities": [],
-            "note": "No conversion data available for analysis"
+            "note": "No data available for analysis"
         }
     
-    # Get account totals
     cur = conn.cursor()
+    
+    # Get account totals
     cur.execute(f"""
     SELECT SUM(cost) as total_spend
     FROM direct_api_detail
-    WHERE date > NOW()::date - INTERVAL '{days} days'
-    """)
+    WHERE date >= NOW()::date - INTERVAL '{days} days'
+        AND client_login = %s
+    """, (client_login,))
     
     total_spend = cur.fetchone()[0]
     total_spend = float(total_spend) if total_spend else 0
-    total_conversions = 0  # No conversions in data yet
     
-    cur.close()
+    # Get all conversions JSONB and sum them
+    cur.execute(f"""
+    SELECT conversions
+    FROM direct_api_detail
+    WHERE date >= NOW()::date - INTERVAL '{days} days'
+        AND client_login = %s
+        AND conversions != '{{}}'
+    """, (client_login,))
+    
+    total_conversions = 0
+    for row in cur.fetchall():
+        conv_data = row[0]
+        if conv_data:
+            for goal_id, models in conv_data.items():
+                if isinstance(models, dict) and 'AUTO' in models:
+                    conv_count = models.get('AUTO', 0)
+                    if isinstance(conv_count, (int, float)):
+                        total_conversions += conv_count
     
     problems = []
     opportunities = []
     
-    # Analyze each segment
+    # Analyze each segment - use simple loop but with cached column map
+    column_map = {
+        "AdFormat": "ad_format",
+        "AdNetworkType": "ad_network_type",
+        "Age": "age",
+        "CriterionType": "criterion_type",
+        "Device": "device",
+        "Gender": "gender",
+        "IncomeGrade": "income_grade",
+        "Placement": "placement",
+        "Slot": "slot",
+        "TargetingCategory": "targeting_category",
+    }
+    
     for segment_name in SEGMENTS:
-        segment_data = analyze_segment(conn, segment_name, days)
+        col = column_map.get(segment_name, segment_name.lower())
         
-        for item in segment_data:
-            if item["spend"] == 0:
+        # Single efficient query per segment with conversions
+        cur.execute(f"""
+        SELECT 
+            COALESCE({col}, 'N/A') as segment_value,
+            SUM(clicks) as clicks,
+            SUM(impressions) as impressions,
+            SUM(cost) as spend,
+            COUNT(DISTINCT campaign_id) as campaign_count,
+            array_agg(conversions) FILTER (WHERE conversions != '{{}}'::jsonb) as conversion_jsons
+        FROM direct_api_detail
+        WHERE date >= NOW()::date - INTERVAL '{days} days'
+            AND {col} IS NOT NULL
+            AND client_login = %s
+        GROUP BY {col}
+        ORDER BY spend DESC
+        """, (client_login,))
+        
+        for row in cur.fetchall():
+            segment_value, clicks, impressions, spend, campaign_count, conv_jsons = row
+            
+            # Sum conversions from JSONB
+            conversions = 0
+            if conv_jsons:
+                for conv_json in conv_jsons:
+                    if conv_json:
+                        for goal_id, models in conv_json.items():
+                            if isinstance(models, dict) and 'AUTO' in models:
+                                conv_count = models.get('AUTO', 0)
+                                if isinstance(conv_count, (int, float)):
+                                    conversions += conv_count
+            
+            # Calculate CPA
+            if conversions > 0:
+                cpa = float(spend) / float(conversions)
+            else:
+                cpa = float(spend) if spend else 0
+            
+            if spend == 0:
                 continue
             
-            cpa_ratio = item["cpa"] / float(account_cpa) if account_cpa > 0 else 0
+            cpa_ratio = cpa / float(account_cpa) if account_cpa > 0 else 0
             
-            # Problem: CPA >= 2x average
+            # Problem: CPA >= 2x average (INCLUDE 0 conversions - it's a problem!)
             if cpa_ratio >= THRESHOLDS["problem"]:
                 severity = "critical" if cpa_ratio >= 3.0 else "high"
                 problems.append({
                     "segment_name": segment_name,
-                    "segment_value": str(item["segment_value"]),
-                    "cpa": item["cpa"],
+                    "segment_value": str(segment_value),
+                    "cpa": round(cpa, 2),
                     "cpa_ratio": round(cpa_ratio, 2),
-                    "spend": item["spend"],
-                    "conversions": item["conversions"],
-                    "clicks": item["clicks"],
-                    "impressions": item["impressions"],
+                    "spend": float(spend),
+                    "conversions": int(conversions),
+                    "clicks": int(clicks) if clicks else 0,
+                    "impressions": int(impressions) if impressions else 0,
                     "severity": severity,
                 })
             
-            # Opportunity: CPA <= 0.5x average AND has conversions (not 0)
-            # Don't include segments with 0 conversions in opportunities
-            elif cpa_ratio <= THRESHOLDS["opportunity"] and item["conversions"] > 0:
+            # Opportunity: CPA <= 0.5x average AND has conversions (EXCLUDE 0 conversions)
+            elif cpa_ratio <= THRESHOLDS["opportunity"] and conversions > 0:
                 potential = "high" if cpa_ratio <= 0.3 else "medium"
                 opportunities.append({
                     "segment_name": segment_name,
-                    "segment_value": str(item["segment_value"]),
-                    "cpa": item["cpa"],
+                    "segment_value": str(segment_value),
+                    "cpa": round(cpa, 2),
                     "cpa_ratio": round(cpa_ratio, 2),
-                    "spend": item["spend"],
-                    "conversions": item["conversions"],
-                    "clicks": item["clicks"],
-                    "impressions": item["impressions"],
+                    "spend": float(spend),
+                    "conversions": int(conversions),
+                    "clicks": int(clicks) if clicks else 0,
+                    "impressions": int(impressions) if impressions else 0,
                     "potential": potential,
                 })
+    
+    cur.close()
+    
+    return {
+        "account_cpa": float(account_cpa),
+        "account_spend": total_spend,
+        "account_conversions": total_conversions,
+        "problems": sorted(problems, key=lambda x: x["cpa_ratio"], reverse=True),
+        "opportunities": sorted(opportunities, key=lambda x: x["cpa_ratio"])
+    }
     
     # Sort by severity/potential
     problems.sort(key=lambda x: x["cpa_ratio"], reverse=True)
@@ -250,6 +332,7 @@ def get_segment_insights(conn, days: int = 30) -> Dict[str, Any]:
 
 def get_segment_campaigns(
     conn, 
+    client_login: str,
     segment_name: str, 
     segment_value: str, 
     limit: int = 3,
@@ -285,28 +368,38 @@ def get_segment_campaigns(
     
     col = column_map.get(segment_name, segment_name.lower())
     
-    # Get campaigns for this segment
+    # Get campaigns for this segment with conversions from JSONB
     sql = f"""
     SELECT 
         campaign_id,
         SUM(clicks) as clicks,
         SUM(impressions) as impressions,
         SUM(cost) as spend,
-        COUNT(*) as detail_rows
+        COUNT(*) as detail_rows,
+        array_agg(conversions) FILTER (WHERE conversions != '{{}}'::jsonb) as conversion_jsons
     FROM direct_api_detail
-    WHERE date > NOW()::date - INTERVAL '30 days'
+    WHERE date >= NOW()::date - INTERVAL '30 days'
         AND {col} = %s
+        AND client_login = %s
     GROUP BY campaign_id
     """
     
-    cur.execute(sql, (segment_value,))
+    cur.execute(sql, (segment_value, client_login))
     campaigns = []
     
     for row in cur.fetchall():
-        campaign_id, clicks, impressions, spend, detail_rows = row
+        campaign_id, clicks, impressions, spend, detail_rows, conv_jsons = row
         
-        # For now, conversions are empty, so assume 0
+        # Sum conversions from JSONB
         conversions = 0
+        if conv_jsons:
+            for conv_json in conv_jsons:
+                if conv_json:
+                    for goal_id, models in conv_json.items():
+                        if isinstance(models, dict) and 'AUTO' in models:
+                            conv_count = models.get('AUTO', 0)
+                            if isinstance(conv_count, (int, float)):
+                                conversions += conv_count
         
         if conversions > 0:
             cpa = float(spend) / float(conversions)
