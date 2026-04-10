@@ -1,9 +1,13 @@
 import os
+import sys
 import psycopg2
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 import logging
+
+# Add parent directory to path so we can import analytics module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 load_dotenv()
 
