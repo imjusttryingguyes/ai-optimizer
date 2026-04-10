@@ -328,6 +328,41 @@
 
         <div id="messageContainer"></div>
 
+        <!-- KPI Plan Form -->
+        <div id="planFormSection" style="display: none; margin-bottom: 30px;">
+            <div class="plan-form">
+                <h3 style="margin-bottom: 20px;">⚙️ Установить KPI на месяц</h3>
+                <form id="kpiPlanForm" onsubmit="savePlanHandler(event)">
+                    <div class="form-group">
+                        <label class="form-label">Месяц</label>
+                        <input type="month" id="planMonth" class="form-input" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Бюджет (₽)</label>
+                        <input type="number" id="planBudget" class="form-input" placeholder="100000" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Целевое количество лидов</label>
+                        <input type="number" id="planLeads" class="form-input" placeholder="100" min="0" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Целевой CPA (₽)</label>
+                        <input type="number" id="planCPA" class="form-input" placeholder="1000" min="0" step="0.01" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">ROI Target (опционально, %)</label>
+                        <input type="number" id="planROI" class="form-input" placeholder="300" min="0" step="0.01">
+                    </div>
+                    
+                    <button type="submit" class="form-submit">💾 Сохранить KPI</button>
+                </form>
+            </div>
+        </div>
+
         <div id="kpiContent" style="display: none;">
             <!-- KPI Status Cards -->
             <div class="kpi-grid">
@@ -438,9 +473,16 @@
         document.getElementById('accountSelect').addEventListener('change', function(e) {
             if (e.target.value) {
                 loadKPIStatus(e.target.value);
+                // Show plan form
+                document.getElementById('planFormSection').style.display = 'block';
+                // Set current month as default
+                const now = new Date();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                document.getElementById('planMonth').value = `${now.getFullYear()}-${month}`;
             } else {
                 document.getElementById('kpiContent').style.display = 'none';
                 document.getElementById('selectPrompt').style.display = 'block';
+                document.getElementById('planFormSection').style.display = 'none';
             }
         });
 
@@ -558,6 +600,40 @@
             } finally {
                 button.disabled = false;
                 button.innerHTML = '⟳ Синхронизация';
+            }
+        }
+
+        async function savePlanHandler(event) {
+            event.preventDefault();
+            
+            const accountId = document.getElementById('accountSelect').value;
+            if (!accountId) {
+                showMessage('Выберите аккаунт', 'error');
+                return;
+            }
+
+            const month = document.getElementById('planMonth').value;
+            const budget = parseFloat(document.getElementById('planBudget').value);
+            const leads = parseFloat(document.getElementById('planLeads').value);
+            const cpa = parseFloat(document.getElementById('planCPA').value);
+            const roi = document.getElementById('planROI').value ? parseFloat(document.getElementById('planROI').value) : null;
+
+            try {
+                const response = await axios.post('/api/kpi-plan', {
+                    account_id: accountId,
+                    year_month: month,
+                    budget_rub: budget,
+                    leads_target: leads,
+                    cpa_target_rub: cpa,
+                    roi_target: roi
+                });
+
+                showMessage(`✅ KPI сохранён для ${month}`, 'success');
+                // Reload KPI status
+                loadKPIStatus(accountId);
+            } catch (error) {
+                const message = error.response?.data?.error || error.message;
+                showMessage('❌ Ошибка сохранения: ' + message, 'error');
             }
         }
     </script>
