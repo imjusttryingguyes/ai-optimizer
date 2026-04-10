@@ -763,7 +763,16 @@ def kpi_dashboard():
 	try:
 		conn = get_conn()
 		cur = conn.cursor()
-		cur.execute("SELECT DISTINCT account_id FROM kpi_monthly_plan ORDER BY account_id")
+		# Get accounts from both kpi_daily_summary (active data) and kpi_monthly_plan (plans)
+		cur.execute("""
+			SELECT DISTINCT account_id 
+			FROM (
+				SELECT DISTINCT account_id FROM kpi_daily_summary
+				UNION
+				SELECT DISTINCT account_id FROM kpi_monthly_plan
+			) t
+			ORDER BY account_id
+		""")
 		accounts = [row[0] for row in cur.fetchall()]
 		cur.close()
 		conn.close()
