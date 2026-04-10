@@ -292,8 +292,8 @@ def get_segment_insights(conn, client_login: str, days: int = 30) -> Dict[str, A
                     "severity": severity,
                 })
             
-            # Opportunity: CPA <= 0.5x average AND has conversions (EXCLUDE 0 conversions)
-            elif cpa_ratio <= THRESHOLDS["opportunity"] and conversions > 0:
+            # Opportunity: CPA <= 0.5x average AND has >= 2 conversions (exclude low volume)
+            elif cpa_ratio <= THRESHOLDS["opportunity"] and conversions >= 2:
                 potential = "high" if cpa_ratio <= 0.3 else "medium"
                 opportunities.append({
                     "segment_name": segment_name,

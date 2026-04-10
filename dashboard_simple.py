@@ -560,10 +560,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         async function showCampaigns(segmentName, segmentValue, isProblem) {
             try {
                 const account = document.getElementById('account').value;
-                const resp = await fetch(`/api/insights/segment/${segmentName}/${encodeURIComponent(segmentValue)}?account=${encodeURIComponent(account)}&is_problem=${isProblem}`);
+                const resp = await fetch(`/api/insights/segment/${segmentName}/${encodeURIComponent(segmentValue)}?is_problem=${isProblem}`);
                 const data = await resp.json();
 
-                const title = isProblem ? 'Кампании с наихудшей СРА' : 'Лучшие кампании';
+                const title = isProblem ? 'Топ 3 кампании с худшей СРА' : 'Топ 3 лучших кампании';
                 const label = isProblem ? 'выше' : 'ниже';
 
                 let html = `
@@ -578,22 +578,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                                     <th>Расход</th>
                                     <th>Конверсии</th>
                                     <th>СРА</th>
-                                    <th>Клики</th>
                                 </tr>
                             </thead>
                             <tbody>
                 `;
 
-                for (const camp of data.campaigns) {
-                    html += `
-                        <tr>
-                            <td>ID: ${camp.campaign_id}</td>
-                            <td>${camp.spend.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</td>
-                            <td>${camp.conversions}</td>
-                            <td><strong>${camp.cpa.toLocaleString('ru-RU', {maximumFractionDigits: 0})}</strong> ₽</td>
-                            <td>${camp.clicks}</td>
-                        </tr>
-                    `;
+                if (data.campaigns && data.campaigns.length > 0) {
+                    for (const camp of data.campaigns) {
+                        const cpaDisplay = camp.conversions > 0 
+                            ? camp.cpa.toLocaleString('ru-RU', {maximumFractionDigits: 0})
+                            : camp.cost.toLocaleString('ru-RU', {maximumFractionDigits: 0}) + ' (0 конв)';
+                        
+                        html += `
+                            <tr>
+                                <td>${camp.campaign_name || 'ID: ' + camp.campaign_id}</td>
+                                <td>${camp.cost.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</td>
+                                <td>${camp.conversions}</td>
+                                <td><strong>${cpaDisplay}</strong> ₽</td>
+                            </tr>
+                        `;
+                    }
+                } else {
+                    html += '<tr><td colspan="4" style="text-align: center; color: #999;">Нет данных</td></tr>';
                 }
 
                 html += '</tbody></table></div>';
@@ -605,6 +611,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 alert('Ошибка: ' + err.message);
             }
         }
+
 
         function closeCampaigns() {
             document.getElementById('campaigns-overlay').classList.remove('show');

@@ -508,85 +508,140 @@ def df_to_api_detail_records(df: pd.DataFrame, conversion_data: dict) -> list:
     return records
 
 
-def insert_api_detail_records(records: list, batch_size: int = 5000) -> int:
-    """Insert records into direct_api_detail table in batches"""
+
+def insert_api_detail_records_streaming(df, conversion_data, chunk_size=5000):
+    """Stream process and insert using COPY"""
+    import sys
+    import json
+    import io
+    sys.path.insert(0, '/opt/ai-optimizer')
+    from db_save import get_pg_conn
+    
+    conn = get_pg_conn()
+    try:
+        records = df_to_api_detail_records(df, conversion_data)
+        print(f"Prepared {len(records):,} unique records, inserting with COPY...")
+        cur = conn.cursor()
+        
+        cols = [
+            "date", "client_login", "campaign_id", "campaign_type", "ad_group_id",
+            "criterion_id", "criterion_type", "query", "impressions", "clicks", "cost",
+            "conversions", "device", "gender", "age", "ad_network_type", "ad_format",
+            "placement", "income_grade", "targeting_category", "targeting_location_id",
+            "avg_click_position", "avg_impression_position", "slot", "avg_traffic_volume", "bounces"
+        ]
+        
+        csv_buffer = io.StringIO()
+        
+        for idx, record in enumerate(records):
+            row_values = []
+            for col in cols:
+                val = record.get(col)
+                if col == "conversions":
+                    val = json.dumps(val) if isinstance(val, dict) else "{}"
+                elif val is None:
+                    val = ""
+                row_values.append(str(val))
+            csv_buffer.write("\t".join(row_values) + "\n")
+            
+            if (idx + 1) % 100000 == 0:
+                print(f"  Prepared {idx + 1:,} records...")
+        
+        csv_buffer.seek(0)
+        
+        sql = f"COPY direct_api_detail ({', '.join(cols)}) FROM STDIN WITH (FORMAT CSV, DELIMITER E'\\t')"
+        
+        cur.copy_expert(sql, csv_buffer)
+        conn.commit()
+        inserted = len(records)
+        print(f"✅ COPY inserted {inserted:,} rows")
+        cur.close()
+        conn.close()
+        return inserted
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        conn.rollback()
+        conn.close()
+        return 0
+
+
+def insert_api_detail_records(records: list, batch_size: int = 1000) -> int:
+    """Insert records into direct_api_detail table using COPY (most efficient)"""
     
     if not records:
         return 0
     
-    # Import here to avoid circular dependencies
     import sys
+    import json
+    import io
     sys.path.insert(0, '/opt/ai-optimizer')
     from db_save import get_pg_conn
     
     conn = get_pg_conn()
     cur = conn.cursor()
     
-    inserted = 0
     total_records = len(records)
+    print(f"Inserting {total_records:,} records using COPY...")
     
-    print(f"Inserting {total_records:,} records in batches of {batch_size:,}...")
-    
-    for batch_start in range(0, total_records, batch_size):
-        batch_end = min(batch_start + batch_size, total_records)
-        batch = records[batch_start:batch_end]
-        batch_num = batch_start // batch_size + 1
-        total_batches = (total_records + batch_size - 1) // batch_size
+    try:
+        # Prepare CSV buffer for COPY
+        csv_buffer = io.StringIO()
         
-        # Build multi-value insert
-        placeholders = []
-        values = []
-        param_index = 1
+        # Write header
+        cols = [
+            "date", "client_login", "campaign_id", "campaign_type", "ad_group_id",
+            "criterion_id", "criterion_type", "query", "impressions", "clicks", "cost",
+            "conversions", "device", "gender", "age", "ad_network_type", "ad_format",
+            "placement", "income_grade", "targeting_category", "targeting_location_id",
+            "avg_click_position", "avg_impression_position", "slot", "avg_traffic_volume", "bounces"
+        ]
         
-        for record in batch:
-            placeholders.append(f"""(
-                %s, %s, %s, %s, %s,
-                %s, %s, %s, %s, %s,
-                %s, %s::jsonb, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s, %s
-            )""")
-            values.extend([
-                record["date"], record["client_login"], record["campaign_id"], record["campaign_type"], record["ad_group_id"],
-                record["criterion_id"], record["criterion_type"], record["query"], record["impressions"], record["clicks"],
-                record["cost"], record["conversions"], record["device"], record["gender"], record["age"], record["ad_network_type"], record["ad_format"],
-                record["placement"], record["income_grade"], record["targeting_category"], record["targeting_location_id"],
-                record["avg_click_position"], record["avg_impression_position"], record["slot"], record["avg_traffic_volume"], record["bounces"]
-            ])
+        # Write records to CSV
+        logged_progress = False
+        for idx, record in enumerate(records):
+            row_values = []
+            for col in cols:
+                val = record.get(col)
+                if col == "conversions":
+                    val = json.dumps(val) if isinstance(val, dict) else "{}"
+                elif val is None:
+                    val = ""
+                row_values.append(str(val))
+            csv_buffer.write("\t".join(row_values) + "\n")
+            
+            if (idx + 1) % 100000 == 0 and idx > 0:
+                print(f"  Prepared {idx + 1:,} records for COPY...")
+                logged_progress = True
         
+        if logged_progress:
+            print(f"  Final: {total_records:,} records ready")
+        
+        # Reset buffer position
+        csv_buffer.seek(0)
+        
+        # Use COPY FROM for bulk insert
         sql = f"""
-        INSERT INTO direct_api_detail (
-            date, client_login, campaign_id, campaign_type, ad_group_id,
-            criterion_id, criterion_type, query, impressions, clicks, cost,
-            conversions, device, gender, age, ad_network_type, ad_format,
-            placement, income_grade, targeting_category, targeting_location_id,
-            avg_click_position, avg_impression_position, slot, avg_traffic_volume, bounces
-        ) VALUES {','.join(placeholders)}
-        ON CONFLICT (date, client_login, campaign_id, ad_group_id, criterion_id, device, gender, age, placement, ad_format)
-        DO UPDATE SET
-            impressions = EXCLUDED.impressions,
-            clicks = EXCLUDED.clicks,
-            cost = EXCLUDED.cost,
-            conversions = EXCLUDED.conversions,
-            updated_at = NOW()
+        COPY direct_api_detail (
+            {', '.join(cols)}
+        ) FROM STDIN WITH (FORMAT CSV, DELIMITER E'\\t')
         """
         
-        try:
-            cur.execute(sql, values)
-            batch_inserted = cur.rowcount
-            inserted += batch_inserted
-            print(f"  Batch {batch_num}/{total_batches}: inserted {batch_inserted:,} rows ({batch_start:,}-{batch_end:,})")
+        cur.copy_expert(sql, csv_buffer)
+        conn.commit()
+        inserted = cur.rowcount
+        print(f"✅ Inserted {inserted:,} rows using COPY")
         
-        except Exception as e:
-            print(f"  ❌ Error in batch {batch_num}: {e}")
-            conn.rollback()
-            cur.close()
-            conn.close()
-            return inserted
-    
-    conn.commit()
-    cur.close()
-    conn.close()
+    except Exception as e:
+        print(f"❌ Error during COPY insert: {e}")
+        import traceback
+        traceback.print_exc()
+        conn.rollback()
+        return 0
+    finally:
+        cur.close()
+        conn.close()
     
     return inserted
 
@@ -637,9 +692,10 @@ def extract_data(mode: str = "daily"):
     print(f"{'='*70}\n")
     
     # Split date range into chunks to avoid API row limit (500K per request)
-    date_ranges = split_date_range(date_from, date_to, max_days=7)
+    # Using 3-day chunks since 7-day chunks still hit the 500K limit
+    date_ranges = split_date_range(date_from, date_to, max_days=3)
     print(f"STEP 1: Fetching CUSTOM_REPORT")
-    print(f"        Splitting into {len(date_ranges)} requests (7-day chunks)")
+    print(f"        Splitting into {len(date_ranges)} requests (3-day chunks)")
     print(f"        Goals: {len(CONFIG['goal_ids'])} conversion targets")
     print(f"        Attribution Models: {CONFIG['attribution_models']}")
     print("-" * 70)
@@ -700,15 +756,18 @@ def extract_data(mode: str = "daily"):
             if col in df.columns:
                 conversion_data[goal_id][model] = col
     
-    # Convert to records (with aggregation for duplicate keys)
-    records = df_to_api_detail_records(df, conversion_data)
-    print(f"Prepared {len(records)} unique records (after deduplication/aggregation)")
-    
-    inserted_total = insert_api_detail_records(records)
-    print(f"✅ Inserted {inserted_total} rows into direct_api_detail\n")
+    # Convert to records and insert in streaming mode (no memory buildup)
+    try:
+        inserted_total = insert_api_detail_records_streaming(df, conversion_data)
+        print(f"✅ Inserted {inserted_total:,} rows into direct_api_detail\n")
+    except Exception as e:
+        print(f"❌ Error during insert: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
     
     print(f"{'='*70}")
-    print(f"✅ COMPLETED: {inserted_total} total rows in direct_api_detail")
+    print(f"✅ COMPLETED: {inserted_total:,} total rows in direct_api_detail")
     print(f"{'='*70}\n")
     
     return inserted_total
