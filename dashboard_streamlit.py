@@ -3,14 +3,20 @@ import pandas as pd
 import psycopg2
 import os
 from datetime import datetime, date
-from dotenv import load_dotenv
 import sys
+import logging
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Load environment variables explicitly
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+
 from analytics.kpi_engine import KPICalculationEngine
 
-load_dotenv()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Streamlit configuration
 st.set_page_config(
@@ -37,13 +43,18 @@ st.markdown("""
 
 def get_db_connection():
     """Get PostgreSQL connection"""
-    return psycopg2.connect(
-        host=os.getenv('DB_HOST'),
-        port=os.getenv('DB_PORT'),
-        database=os.getenv('DB_NAME'),
-        user=os.getenv('DB_USER'),
-        password=os.getenv('DB_PASSWORD')
-    )
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST', 'localhost'),
+            port=os.getenv('DB_PORT', '5432'),
+            database=os.getenv('DB_NAME', 'ai_optimizer'),
+            user=os.getenv('DB_USER', 'postgres'),
+            password=os.getenv('DB_PASSWORD')
+        )
+        return conn
+    except psycopg2.Error as e:
+        logger.error(f"Database connection error: {e}")
+        raise
 
 def get_accounts():
     """Get available accounts"""
@@ -62,8 +73,10 @@ def get_accounts():
         accounts = [row[0] for row in cur.fetchall()]
         cur.close()
         conn.close()
+        logger.info(f"Loaded {len(accounts)} accounts")
         return accounts
     except Exception as e:
+        logger.error(f"Error loading accounts: {e}")
         st.error(f"❌ Ошибка подключения к БД: {str(e)}")
         return []
 
