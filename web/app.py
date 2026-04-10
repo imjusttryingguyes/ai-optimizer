@@ -769,6 +769,50 @@ def api_kpi_sync():
 	except Exception as e:
 		return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/insights', methods=['GET'])
+def get_insights():
+	"""Level 2 Analytics - Account Trend Insights (30-day analysis)"""
+	try:
+		sys.path.insert(0, '/opt/ai-optimizer')
+		from analytics.insights_engine import get_segment_insights
+		
+		conn = get_conn()
+		insights = get_segment_insights(conn, days=30)
+		conn.close()
+		
+		return jsonify(insights)
+	
+	except Exception as e:
+		logger.error(f"Insights error: {e}", exc_info=True)
+		return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/insights/segment/<segment_name>/<segment_value>', methods=['GET'])
+def get_segment_campaigns(segment_name, segment_value):
+	"""Get top 3 campaigns for a specific segment (for drill-down)"""
+	try:
+		sys.path.insert(0, '/opt/ai-optimizer')
+		from analytics.insights_engine import get_segment_campaigns as get_campaigns
+		
+		# Determine if this is a problem (show worst) or opportunity (show best)
+		is_problem = request.args.get('is_problem', 'true').lower() == 'true'
+		
+		conn = get_conn()
+		campaigns = get_campaigns(conn, segment_name, segment_value, limit=3, show_worst=is_problem)
+		conn.close()
+		
+		return jsonify({
+			"segment_name": segment_name,
+			"segment_value": segment_value,
+			"is_problem": is_problem,
+			"campaigns": campaigns,
+		})
+	
+	except Exception as e:
+		logger.error(f"Segment campaigns error: {e}", exc_info=True)
+		return jsonify({"error": str(e)}), 500
+
 @app.route('/kpi')
 def kpi_dashboard():
 	"""KPI Dashboard UI (Level 1)"""

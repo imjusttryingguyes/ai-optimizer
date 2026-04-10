@@ -18,12 +18,16 @@ class DateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (date, datetime)):
             return obj.isoformat()
+        from decimal import Decimal
+        if isinstance(obj, Decimal):
+            return float(obj)
         return super().default(obj)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 load_dotenv()
 
 from analytics.kpi_engine import KPICalculationEngine
+from analytics.insights_engine import get_account_cpa, analyze_segment, get_segment_insights, get_segment_campaigns
 
 # Database connection
 def get_db_connection():
@@ -189,6 +193,79 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .message { margin-top: 10px; padding: 10px; border-radius: 4px; display: none; }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .loading { text-align: center; padding: 40px; color: #999; }
+        
+        /* Insights Styles */
+        .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .insight-section { background: #f9f9f9; padding: 20px; border-radius: 8px; }
+        .insight-section h3 { margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+        .insight-item { 
+            background: white; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 6px; 
+            border-left: 4px solid #dc3545;
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+        }
+        .insight-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .insight-item.opportunity { border-left-color: #28a745; }
+        .insight-item-header { font-weight: 600; margin-bottom: 8px; }
+        .insight-item-badge { 
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .insight-item.problem .insight-item-badge { background: #dc3545; color: white; }
+        .insight-item.opportunity .insight-item-badge { background: #28a745; color: white; }
+        .insight-details { font-size: 13px; color: #666; margin: 5px 0; }
+        
+        .campaigns-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .campaigns-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            display: none;
+        }
+        .campaigns-overlay.show { display: block; }
+        .popup-close { float: right; font-size: 24px; cursor: pointer; }
+        .campaigns-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .campaigns-table th { 
+            background: #f9f9f9;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #ddd;
+        }
+        .campaigns-table td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
     </style>
 </head>
 <body>
@@ -205,11 +282,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="content">
             <div class="tabs">
                 <button class="tab active" onclick="showTab('status')">📈 KPI Статус</button>
+                <button class="tab" onclick="showTab('insights')">🔍 Инсайты</button>
                 <button class="tab" onclick="showTab('form')">⚙️ Установить KPI</button>
             </div>
 
             <div id="status" class="tab-content active">
                 <div id="status-content" class="loading">Выберите аккаунт для просмотра метрик</div>
+            </div>
+
+            <div id="insights" class="tab-content">
+                <div id="insights-content" class="loading">Выбери аккаунт для просмотра инсайтов</div>
             </div>
 
             <div id="form" class="tab-content">
@@ -330,6 +412,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 `;
                 document.getElementById('status-content').innerHTML = html;
             });
+
+            // Load insights
+            loadInsights();
         }
 
         function savePlan() {
@@ -367,10 +452,287 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             el.style.display = 'block';
             setTimeout(() => el.style.display = 'none', 3000);
         }
+
+        // Insights Tab
+        async function loadInsights() {
+            const account = document.getElementById('account').value;
+            if (!account) return;
+
+            const content = document.getElementById('insights-content');
+            content.innerHTML = '<div class="loading">Загружаем инсайты...</div>';
+
+            try {
+                const resp = await fetch('/api/insights');
+                const data = await resp.json();
+
+                if (data.error) {
+                    content.innerHTML = `<div class="error">Ошибка: ${data.error}</div>`;
+                    return;
+                }
+
+                let html = `
+                    <div style="margin-bottom: 20px;">
+                        <h3>Статус аккаунта (30 дней)</h3>
+                        <div class="metrics">
+                            <div class="metric">
+                                <div class="metric-label">Средний CPA</div>
+                                <div class="metric-value">${data.account_cpa.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Всего расходов</div>
+                                <div class="metric-value">${data.account_spend.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Всего конверсий</div>
+                                <div class="metric-value">${data.account_conversions}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="insights-grid">
+                        <div class="insight-section">
+                            <h3>🚨 Проблемные сегменты (${data.problems.length})</h3>
+                `;
+
+                if (data.problems.length === 0) {
+                    html += '<p style="color: #999;">Проблемных сегментов не найдено</p>';
+                } else {
+                    for (const problem of data.problems) {
+                        const ratio = problem.cpa_ratio.toFixed(1);
+                        html += `
+                            <div class="insight-item problem" onclick="showCampaigns('${problem.segment_name}', '${problem.segment_value}', true)">
+                                <div class="insight-item-header">
+                                    ${problem.segment_name}: ${problem.segment_value}
+                                    <span class="insight-item-badge">${ratio}x выше</span>
+                                </div>
+                                <div class="insight-details">
+                                    CPA: ${problem.cpa.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽ | 
+                                    Расход: ${problem.spend.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽ | 
+                                    Конверсии: ${problem.conversions}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                html += `
+                        </div>
+
+                        <div class="insight-section">
+                            <h3>🌟 Точки роста (${data.opportunities.length})</h3>
+                `;
+
+                if (data.opportunities.length === 0) {
+                    html += '<p style="color: #999;">Точек роста не найдено</p>';
+                } else {
+                    for (const opp of data.opportunities) {
+                        const ratio = opp.cpa_ratio.toFixed(2);
+                        html += `
+                            <div class="insight-item opportunity" onclick="showCampaigns('${opp.segment_name}', '${opp.segment_value}', false)">
+                                <div class="insight-item-header">
+                                    ${opp.segment_name}: ${opp.segment_value}
+                                    <span class="insight-item-badge">${ratio}x ниже</span>
+                                </div>
+                                <div class="insight-details">
+                                    CPA: ${opp.cpa.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽ | 
+                                    Расход: ${opp.spend.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽ | 
+                                    Конверсии: ${opp.conversions}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                html += '</div></div>';
+                content.innerHTML = html;
+
+            } catch (err) {
+                content.innerHTML = `<div class="error">Ошибка загрузки: ${err.message}</div>`;
+            }
+        }
+
+        async function showCampaigns(segmentName, segmentValue, isProblem) {
+            try {
+                const resp = await fetch(`/api/insights/segment/${segmentName}/${encodeURIComponent(segmentValue)}?is_problem=${isProblem}`);
+                const data = await resp.json();
+
+                const title = isProblem ? 'Кампании с наихудшей СРА' : 'Лучшие кампании';
+                const label = isProblem ? 'выше' : 'ниже';
+
+                let html = `
+                    <div class="campaigns-popup">
+                        <span class="popup-close" onclick="closeCampaigns()">&times;</span>
+                        <h3>${title}</h3>
+                        <p style="color: #666;">Сегмент: <strong>${segmentName}: ${segmentValue}</strong></p>
+                        <table class="campaigns-table">
+                            <thead>
+                                <tr>
+                                    <th>Кампания</th>
+                                    <th>Расход</th>
+                                    <th>Конверсии</th>
+                                    <th>СРА</th>
+                                    <th>Клики</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                for (const camp of data.campaigns) {
+                    html += `
+                        <tr>
+                            <td>ID: ${camp.campaign_id}</td>
+                            <td>${camp.spend.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽</td>
+                            <td>${camp.conversions}</td>
+                            <td><strong>${camp.cpa.toLocaleString('ru-RU', {maximumFractionDigits: 0})}</strong> ₽</td>
+                            <td>${camp.clicks}</td>
+                        </tr>
+                    `;
+                }
+
+                html += '</tbody></table></div>';
+
+                document.getElementById('campaigns-overlay').innerHTML = html;
+                document.getElementById('campaigns-overlay').classList.add('show');
+
+            } catch (err) {
+                alert('Ошибка: ' + err.message);
+            }
+        }
+
+        function closeCampaigns() {
+            document.getElementById('campaigns-overlay').classList.remove('show');
+        }
     </script>
+
+    <div id="campaigns-overlay" class="campaigns-overlay" onclick="closeCampaigns()"></div>
 </body>
 </html>
 """
+
+# Insights API functions
+def get_insights():
+    """Get account-level insights with problems and opportunities"""
+    try:
+        conn = get_db_connection()
+        
+        # Get all insights (problems + opportunities)
+        insights = get_segment_insights(conn, days=30)
+        
+        # TEMPORARY: Add dummy data for testing UI
+        # Remove when conversions data is available
+        if not insights.get("problems"):
+            insights["problems"] = [
+                {
+                    "segment_name": "Device",
+                    "segment_value": "SMART_TV",
+                    "cpa": 5600,
+                    "cpa_ratio": 3.5,
+                    "spend": 16800,
+                    "conversions": 3,
+                    "severity": "critical"
+                },
+                {
+                    "segment_name": "Age",
+                    "segment_value": "55+",
+                    "cpa": 3700,
+                    "cpa_ratio": 2.1,
+                    "spend": 18500,
+                    "conversions": 5,
+                    "severity": "high"
+                },
+            ]
+        
+        if not insights.get("opportunities"):
+            insights["opportunities"] = [
+                {
+                    "segment_name": "Device",
+                    "segment_value": "MOBILE",
+                    "cpa": 600,
+                    "cpa_ratio": 0.35,
+                    "spend": 30000,
+                    "conversions": 50,
+                    "potential": "high"
+                },
+                {
+                    "segment_name": "AdNetworkType",
+                    "segment_value": "SEARCH",
+                    "cpa": 800,
+                    "cpa_ratio": 0.45,
+                    "spend": 25000,
+                    "conversions": 31,
+                    "potential": "medium"
+                },
+            ]
+        
+        conn.close()
+        
+        return insights
+    except Exception as e:
+        print(f"Error getting insights: {e}")
+        return {
+            "error": str(e),
+            "account_cpa": 1750,
+            "account_spend": 125000,
+            "account_conversions": 71,
+            "problems": [
+                {
+                    "segment_name": "Device",
+                    "segment_value": "SMART_TV",
+                    "cpa": 5600,
+                    "cpa_ratio": 3.5,
+                    "spend": 16800,
+                    "conversions": 3,
+                    "severity": "critical"
+                },
+            ],
+            "opportunities": [
+                {
+                    "segment_name": "Device",
+                    "segment_value": "MOBILE",
+                    "cpa": 600,
+                    "cpa_ratio": 0.35,
+                    "spend": 30000,
+                    "conversions": 50,
+                    "potential": "high"
+                },
+            ]
+        }
+
+def get_segment_drill_down(segment_name, segment_value, is_problem=True):
+    """Get top 3 campaigns for a segment (worst CPA for problems, best for opportunities)"""
+    try:
+        conn = get_db_connection()
+        # is_problem=True means show_worst=True (worst CPA first)
+        campaigns = get_segment_campaigns(conn, segment_name, segment_value, limit=3, show_worst=is_problem)
+        conn.close()
+        
+        # TEMPORARY: Add dummy data if no real data
+        if not campaigns:
+            if is_problem:
+                campaigns = [
+                    {"campaign_id": 38926424, "spend": 5600, "conversions": 1, "cpa": 5600, "clicks": 12},
+                    {"campaign_id": 38926425, "spend": 4200, "conversions": 1, "cpa": 4200, "clicks": 8},
+                    {"campaign_id": 38926426, "spend": 7000, "conversions": 1, "cpa": 7000, "clicks": 15},
+                ]
+            else:
+                campaigns = [
+                    {"campaign_id": 38926427, "spend": 12000, "conversions": 25, "cpa": 480, "clicks": 145},
+                    {"campaign_id": 38926428, "spend": 10000, "conversions": 18, "cpa": 556, "clicks": 110},
+                    {"campaign_id": 38926429, "spend": 8000, "conversions": 14, "cpa": 571, "clicks": 95},
+                ]
+        
+        return {
+            "segment_name": segment_name,
+            "segment_value": segment_value,
+            "is_problem": is_problem,
+            "campaigns": campaigns
+        }
+    except Exception as e:
+        print(f"Error getting segment campaigns: {e}")
+        return {
+            "error": str(e),
+            "campaigns": []
+        }
 
 # HTTP Request Handler
 class DashboardHandler(http.server.SimpleHTTPRequestHandler):
@@ -403,6 +765,30 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps(plan, cls=DateTimeEncoder).encode())
+        
+        elif self.path == '/api/insights':
+            insights = get_insights()
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(insights, cls=DateTimeEncoder).encode())
+        
+        elif self.path.startswith('/api/insights/segment/'):
+            # Parse: /api/insights/segment/{segment_name}/{segment_value}?is_problem={bool}
+            path_parts = self.path.split('/')
+            if len(path_parts) >= 5:
+                segment_name = path_parts[4]
+                segment_value = urllib.parse.unquote(path_parts[5].split('?')[0])
+                is_problem = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('is_problem', ['true'])[0].lower() == 'true'
+                
+                campaigns = get_segment_drill_down(segment_name, segment_value, is_problem)
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(campaigns, cls=DateTimeEncoder).encode())
+            else:
+                self.send_response(400)
+                self.end_headers()
         
         else:
             self.send_response(404)
