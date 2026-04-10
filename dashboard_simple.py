@@ -1,0 +1,412 @@
+#!/usr/bin/env python3
+"""
+Simple HTTP Dashboard - zero dependencies, 100% reliable
+No Flask, No Streamlit, no WebSockets - just plain HTTP
+"""
+
+import http.server
+import json
+import urllib.parse
+import psycopg2
+import os
+import sys
+from datetime import date
+from dotenv import load_dotenv
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+load_dotenv()
+
+from analytics.kpi_engine import KPICalculationEngine
+
+# Database connection
+def get_db_connection():
+    return psycopg2.connect(
+        host=os.getenv('DB_HOST', 'localhost'),
+        port=os.getenv('DB_PORT', '5432'),
+        database=os.getenv('DB_NAME', 'ai_optimizer'),
+        user=os.getenv('DB_USER', 'postgres'),
+        password=os.getenv('DB_PASSWORD')
+    )
+
+# Get accounts
+def get_accounts():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT account_id 
+            FROM (
+                SELECT DISTINCT account_id FROM kpi_daily_summary
+                UNION
+                SELECT DISTINCT account_id FROM kpi_monthly_plan
+            ) t
+            ORDER BY account_id
+        """)
+        accounts = [row[0] for row in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return accounts
+    except Exception as e:
+        print(f"Error: {e}")
+        return []
+
+# Get KPI status
+def get_kpi_status(account_id):
+    try:
+        conn = get_db_connection()
+        engine = KPICalculationEngine(conn)
+        status = engine.calculate_kpi_status(account_id)
+        engine.close()
+        conn.close()
+        
+        if isinstance(status, dict) and 'error' in status:
+            return {"no_plan": True, "error": status['error']}
+        return status
+    except Exception as e:
+        return {"error": str(e)}
+
+# Get current plan
+def get_current_plan(account_id):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        today = date.today()
+        year_month = f"{today.year}-{today.month:02d}"
+        
+        cur.execute("""
+            SELECT budget_rub, leads_target, cpa_target_rub, roi_target
+            FROM kpi_monthly_plan
+            WHERE account_id = %s AND year_month = %s
+        """, (account_id, year_month))
+        
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if result:
+            return {
+                "budget": result[0],
+                "leads": result[1],
+                "cpa": result[2],
+                "roi": result[3]
+            }
+        return None
+    except Exception as e:
+        return None
+
+# Save plan
+def save_plan(account_id, year_month, budget, leads, cpa, roi=None):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            INSERT INTO kpi_monthly_plan (account_id, year_month, budget_rub, leads_target, cpa_target_rub, roi_target, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (account_id, year_month) DO UPDATE SET
+                budget_rub = %s,
+                leads_target = %s,
+                cpa_target_rub = %s,
+                roi_target = %s,
+                updated_at = NOW()
+        """, (account_id, year_month, budget, leads, cpa, roi, budget, leads, cpa, roi))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Save error: {e}")
+        return False
+
+# HTML Template
+HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KPI Dashboard - AI Optimizer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .header h1 { color: #333; margin-bottom: 10px; }
+        .selector { display: flex; gap: 10px; }
+        select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        .content { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+        .tab { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 14px; color: #666; }
+        .tab.active { color: #007bff; border-bottom: 2px solid #007bff; margin-bottom: -2px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; color: #333; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #0056b3; }
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .metric { background: #f9f9f9; padding: 15px; border-radius: 4px; border-left: 4px solid #007bff; }
+        .metric-label { font-size: 12px; color: #666; margin-bottom: 5px; }
+        .metric-value { font-size: 24px; font-weight: bold; color: #333; }
+        .metric-small { font-size: 12px; color: #999; margin-top: 5px; }
+        .alert { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin-top: 10px; border-radius: 4px; }
+        .error { background: #f8d7da; border-left: 4px solid #dc3545; padding: 12px; margin-top: 10px; border-radius: 4px; color: #721c24; }
+        .success { background: #d4edda; border-left: 4px solid #28a745; padding: 12px; margin-top: 10px; border-radius: 4px; color: #155724; }
+        .message { margin-top: 10px; padding: 10px; border-radius: 4px; display: none; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .loading { text-align: center; padding: 40px; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 KPI Dashboard</h1>
+            <div class="selector">
+                <select id="account" onchange="loadAccount()">
+                    <option value="">-- Выберите аккаунт --</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('status')">📈 KPI Статус</button>
+                <button class="tab" onclick="showTab('form')">⚙️ Установить KPI</button>
+            </div>
+
+            <div id="status" class="tab-content active">
+                <div id="status-content" class="loading">Выберите аккаунт для просмотра метрик</div>
+            </div>
+
+            <div id="form" class="tab-content">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Месяц</label>
+                        <input type="month" id="month">
+                    </div>
+                    <div class="form-group">
+                        <label>Бюджет (₽)</label>
+                        <input type="number" id="budget" placeholder="100000" min="0" step="1000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Целевое количество лидов</label>
+                        <input type="number" id="leads" placeholder="100" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Целевой CPA (₽)</label>
+                        <input type="number" id="cpa" placeholder="1000" min="0" step="100">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>ROI Target (% - опционально)</label>
+                    <input type="number" id="roi" placeholder="300" min="0" step="10">
+                </div>
+                <button onclick="savePlan()">💾 Сохранить KPI</button>
+                <div id="form-message" class="message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize month
+        const today = new Date();
+        const month = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+        document.getElementById('month').value = month;
+
+        // Load accounts
+        fetch('/api/accounts').then(r => r.json()).then(data => {
+            const sel = document.getElementById('account');
+            data.forEach(acc => {
+                const opt = document.createElement('option');
+                opt.value = acc;
+                opt.textContent = acc;
+                sel.appendChild(opt);
+            });
+        });
+
+        function showTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function loadAccount() {
+            const account = document.getElementById('account').value;
+            if (!account) return;
+            
+            // Load plan
+            fetch('/api/plan?account=' + account).then(r => r.json()).then(data => {
+                if (data) {
+                    document.getElementById('budget').value = data.budget || '';
+                    document.getElementById('leads').value = data.leads || '';
+                    document.getElementById('cpa').value = data.cpa || '';
+                    document.getElementById('roi').value = data.roi || '';
+                }
+            });
+
+            // Load KPI status
+            fetch('/api/status?account=' + account).then(r => r.json()).then(data => {
+                if (data.no_plan) {
+                    document.getElementById('status-content').innerHTML = '<div class="alert">ℹ️ Установите KPI план для просмотра метрик</div>';
+                    return;
+                }
+                
+                const html = `
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="metric-label">💰 Бюджет</div>
+                            <div class="metric-value">${Math.round(data.budget.spent).toLocaleString('ru-RU')} ₽</div>
+                            <div class="metric-small">Темп: ${Math.round(data.budget.pacing_pct)}%</div>
+                            <div class="metric-small">План: ${Math.round(data.budget.target).toLocaleString('ru-RU')} ₽</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">📊 Лиды</div>
+                            <div class="metric-value">${data.conversions.actual}</div>
+                            <div class="metric-small">Темп: ${Math.round(data.conversions.pacing_pct)}%</div>
+                            <div class="metric-small">План: ${data.conversions.target}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">💵 CPA</div>
+                            <div class="metric-value">${Math.round(data.cpa.actual).toLocaleString('ru-RU')} ₽</div>
+                            <div class="metric-small">План: ${Math.round(data.cpa.target).toLocaleString('ru-RU')} ₽</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">✅ Статус</div>
+                            <div class="metric-value">${data.summary.overall_status || 'OK'}</div>
+                        </div>
+                    </div>
+                    <h3>🔮 Прогноз на конец месяца</h3>
+                    <div class="metrics" style="grid-template-columns: 1fr 1fr 1fr;">
+                        <div class="metric">
+                            <div class="metric-label">Расход</div>
+                            <div class="metric-value">${Math.round(data.forecast.end_month_spend).toLocaleString('ru-RU')} ₽</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Лиды</div>
+                            <div class="metric-value">${data.forecast.end_month_conversions}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">CPA</div>
+                            <div class="metric-value">${Math.round(data.forecast.end_month_cpa).toLocaleString('ru-RU')} ₽</div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('status-content').innerHTML = html;
+            });
+        }
+
+        function savePlan() {
+            const account = document.getElementById('account').value;
+            if (!account) {
+                showMessage('Выберите аккаунт', 'error');
+                return;
+            }
+
+            fetch('/api/plan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    account: account,
+                    month: document.getElementById('month').value,
+                    budget: parseFloat(document.getElementById('budget').value),
+                    leads: parseInt(document.getElementById('leads').value),
+                    cpa: parseFloat(document.getElementById('cpa').value),
+                    roi: document.getElementById('roi').value ? parseFloat(document.getElementById('roi').value) : null
+                })
+            }).then(r => r.json()).then(data => {
+                if (data.success) {
+                    showMessage('✅ KPI сохранён', 'success');
+                    setTimeout(loadAccount, 500);
+                } else {
+                    showMessage('❌ ' + data.error, 'error');
+                }
+            });
+        }
+
+        function showMessage(text, type) {
+            const el = document.getElementById('form-message');
+            el.textContent = text;
+            el.className = 'message ' + type;
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
+    </script>
+</body>
+</html>
+"""
+
+# HTTP Request Handler
+class DashboardHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(HTML_TEMPLATE.encode())
+        
+        elif self.path == '/api/accounts':
+            accounts = get_accounts()
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(accounts).encode())
+        
+        elif self.path.startswith('/api/status?'):
+            account = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('account', [''])[0]
+            status = get_kpi_status(account)
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(status).encode())
+        
+        elif self.path.startswith('/api/plan?'):
+            account = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('account', [''])[0]
+            plan = get_current_plan(account)
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(plan).encode())
+        
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_POST(self):
+        if self.path == '/api/plan':
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode()
+            data = json.loads(body)
+            
+            success = save_plan(
+                data.get('account'),
+                data.get('month'),
+                data.get('budget'),
+                data.get('leads'),
+                data.get('cpa'),
+                data.get('roi')
+            )
+            
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": success}).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        print(f"[HTTP] {format % args}")
+
+if __name__ == '__main__':
+    PORT = 8501
+    server = http.server.HTTPServer(('0.0.0.0', PORT), DashboardHandler)
+    print(f"✅ Dashboard запущен на http://0.0.0.0:{PORT}")
+    print(f"📍 Откройте в браузере: http://127.0.0.1:{PORT}")
+    print(f"🌐 Или по внешнему IP: http://43.245.224.117:{PORT}")
+    print(f"\nНажмите Ctrl+C для остановки\n")
+    server.serve_forever()
