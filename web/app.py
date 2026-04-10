@@ -619,7 +619,19 @@ def api_kpi_status():
 		engine.close()
 		conn.close()
 		
-		return jsonify(status)
+		# Check if response is an error (no KPI plan) - return 200 but with no_plan flag
+		if isinstance(status, dict) and 'error' in status:
+			return jsonify({
+				"no_plan": True,
+				"error": status['error'],
+				"budget": {"spent": 0, "pacing_pct": 0, "target": 0, "remaining": 0, "severity": "ok"},
+				"conversions": {"actual": 0, "pacing_pct": 0, "target": 0, "remaining": 0, "severity": "ok"},
+				"cpa": {"actual": 0, "target": 0, "deviation_pct": 0, "status": "ok"},
+				"forecast": {"end_month_spend": 0, "end_month_conversions": 0, "end_month_cpa": 0},
+				"summary": {"key_alerts": ["Установите KPI план для этого аккаунта"]}
+			}), 200
+		
+		return jsonify(status), 200
 	
 	except Exception as e:
 		return jsonify({"error": str(e)}), 500

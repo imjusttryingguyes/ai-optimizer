@@ -363,7 +363,7 @@
             </div>
         </div>
 
-        <div id="kpiContent" style="display: none;">
+        <div id="metricsSection" style="display: none;">
             <!-- KPI Status Cards -->
             <div class="kpi-grid">
                 <!-- Budget Card -->
@@ -480,7 +480,7 @@
                 const month = String(now.getMonth() + 1).padStart(2, '0');
                 document.getElementById('planMonth').value = `${now.getFullYear()}-${month}`;
             } else {
-                document.getElementById('kpiContent').style.display = 'none';
+                document.getElementById('metricsSection').style.display = 'none';
                 document.getElementById('selectPrompt').style.display = 'block';
                 document.getElementById('planFormSection').style.display = 'none';
             }
@@ -488,7 +488,7 @@
 
         async function loadKPIStatus(accountId) {
             try {
-                document.getElementById('kpiContent').style.display = 'block';
+                document.getElementById('metricsSection').style.display = 'block';
                 document.getElementById('selectPrompt').style.display = 'none';
 
                 const response = await axios.get('/api/kpi-status', {
@@ -496,7 +496,20 @@
                 });
 
                 const data = response.data;
-                displayKPIStatus(data);
+                
+                // Check if no plan is set
+                if (data.no_plan) {
+                    // Show form and hide KPI content
+                    document.getElementById('planFormSection').style.display = 'block';
+                    document.getElementById('metricsSection').style.display = 'none';
+                    document.getElementById('selectPrompt').style.display = 'block';
+                    document.getElementById('selectPrompt').innerHTML = '<p style="font-size: 16px; color: #999;">Установите KPI план для просмотра метрик</p>';
+                } else {
+                    // Show KPI content and hide form
+                    document.getElementById('metricsSection').style.display = 'block';
+                    document.getElementById('planFormSection').style.display = 'none';
+                    displayKPIStatus(data);
+                }
             } catch (error) {
                 showMessage('Ошибка при загрузке KPI: ' + error.message, 'error');
             }
