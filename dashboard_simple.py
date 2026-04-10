@@ -10,8 +10,15 @@ import urllib.parse
 import psycopg2
 import os
 import sys
-from datetime import date
+from datetime import date, datetime
 from dotenv import load_dotenv
+
+# Custom JSON encoder for date objects
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        return super().default(obj)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 load_dotenv()
@@ -53,6 +60,11 @@ def get_accounts():
 # Get KPI status
 def get_kpi_status(account_id):
     try:
+        # Quick check if plan exists
+        plan = get_current_plan(account_id)
+        if not plan:
+            return {"no_plan": True, "error": "No KPI plan found"}
+        
         conn = get_db_connection()
         engine = KPICalculationEngine(conn)
         status = engine.calculate_kpi_status(account_id)
@@ -72,13 +84,14 @@ def get_current_plan(account_id):
         cur = conn.cursor()
         
         today = date.today()
-        year_month = f"{today.year}-{today.month:02d}"
+        # Create first day of current month for date comparison
+        month_start = f"{today.year}-{today.month:02d}-01"
         
         cur.execute("""
             SELECT budget_rub, leads_target, cpa_target_rub, roi_target
             FROM kpi_monthly_plan
-            WHERE account_id = %s AND year_month = %s
-        """, (account_id, year_month))
+            WHERE account_id = %s AND date_trunc('month', year_month) = date_trunc('month', %s::date)
+        """, (account_id, month_start))
         
         result = cur.fetchone()
         cur.close()
@@ -101,16 +114,35 @@ def save_plan(account_id, year_month, budget, leads, cpa, roi=None):
         conn = get_db_connection()
         cur = conn.cursor()
         
+        # Convert "2026-04" to dates
+        year, month = year_month.split('-')
+        year = int(year)
+        month = int(month)
+        
+        # First day of month
+        month_start = f"{year}-{month:02d}-01"
+        
+        # Last day of month
+        if month == 12:
+            next_month_start = f"{year+1}-01-01"
+        else:
+            next_month_start = f"{year}-{month+1:02d}-01"
+        
+        # Last day is day before next month start
+        from datetime import datetime, timedelta
+        next_date = datetime.strptime(next_month_start, "%Y-%m-%d")
+        last_day = (next_date - timedelta(days=1)).strftime("%Y-%m-%d")
+        
         cur.execute("""
-            INSERT INTO kpi_monthly_plan (account_id, year_month, budget_rub, leads_target, cpa_target_rub, roi_target, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            INSERT INTO kpi_monthly_plan (account_id, year_month, month_start, month_end, budget_rub, leads_target, cpa_target_rub, roi_target, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (account_id, year_month) DO UPDATE SET
                 budget_rub = %s,
                 leads_target = %s,
                 cpa_target_rub = %s,
                 roi_target = %s,
                 updated_at = NOW()
-        """, (account_id, year_month, budget, leads, cpa, roi, budget, leads, cpa, roi))
+        """, (account_id, month_start, month_start, last_day, budget, leads, cpa, roi, budget, leads, cpa, roi))
         
         conn.commit()
         cur.close()
@@ -354,7 +386,7 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps(accounts).encode())
+            self.wfile.write(json.dumps(accounts, cls=DateTimeEncoder).encode())
         
         elif self.path.startswith('/api/status?'):
             account = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('account', [''])[0]
@@ -362,7 +394,7 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps(status).encode())
+            self.wfile.write(json.dumps(status, cls=DateTimeEncoder).encode())
         
         elif self.path.startswith('/api/plan?'):
             account = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get('account', [''])[0]
@@ -370,7 +402,7 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps(plan).encode())
+            self.wfile.write(json.dumps(plan, cls=DateTimeEncoder).encode())
         
         else:
             self.send_response(404)
