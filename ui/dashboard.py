@@ -19,17 +19,26 @@ import plotly.graph_objects as go
 import plotly.express as px
 from streamlit_option_menu import option_menu
 
-load_dotenv('/opt/ai-optimizer/.env')
+# Load environment variables - works both locally and on HF
+load_dotenv()  # Will find .env in current directory if exists
+# On HuggingFace, variables come from Repository Secrets as env vars
 
 # ============================================================================
 # CONFIG
 # ============================================================================
 
 DB_HOST = os.getenv('DB_HOST')
-DB_PORT = os.getenv('DB_PORT', '5432')
+DB_PORT = int(os.getenv('DB_PORT', '5432'))
 DB_USER = os.getenv('DB_USER')
 DB_PASSWORD = os.getenv('DB_PASSWORD')
 DB_NAME = os.getenv('DB_NAME')
+YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')
+YANDEX_LOGIN = os.getenv('YANDEX_LOGIN')
+
+# Check if all required env vars are set
+if not all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
+    st.error("❌ Missing database configuration. Please add all required Secrets to HF Settings.")
+    st.stop()
 
 st.set_page_config(
     page_title="Phase 4: Аналитика кампаний",
