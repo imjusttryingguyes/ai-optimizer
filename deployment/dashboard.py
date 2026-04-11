@@ -12,6 +12,10 @@ import sys
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
+# Для Hugging Face Spaces
+if os.getenv('SPACE_ID'):
+    load_dotenv('/tmp/.env')  # Загружаем переменные из secrets
+
 import streamlit as st
 import psycopg2
 import pandas as pd
