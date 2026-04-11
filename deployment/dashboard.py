@@ -92,7 +92,17 @@ def load_campaigns():
     
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+            campaigns = data.get('campaigns', [])
+            
+            # Add CTR calculation if missing
+            for camp in campaigns:
+                if 'ctr' not in camp['stats'] and camp['stats'].get('clicks', 0) > 0:
+                    impressions = camp['stats'].get('impressions', 1)
+                    clicks = camp['stats'].get('clicks', 0)
+                    camp['stats']['ctr'] = (clicks / impressions * 100) if impressions > 0 else 0
+            
+            return campaigns
     except Exception as e:
         st.error(f"❌ Error loading campaigns.json: {str(e)}")
         return None
@@ -195,8 +205,16 @@ if selected == "📈 Overview":
 
 elif selected == "🔍 Account Segments":
     st.markdown("## Account-Level Segment Analysis")
-    st.markdown(f"*Threshold: Cost > ₽{insights['avg_cpa_threshold']:,.2f}*")
     
+    # Calculate account CPA threshold
+    account_total_cost = sum(day['cost'] for day in account_kpi['daily'])
+    account_total_conv = sum(day['conversions'] for day in account_kpi['daily'])
+    account_avg_cpa = account_total_cost / max(account_total_conv, 1)
+    
+    st.markdown(f"*Account CPA: ₽{account_avg_cpa:,.2f} (baseline for opportunities/issues)*")
+    st.markdown(f"*Cost threshold: ₽{insights['avg_cpa_threshold']:,.2f}*")
+    
+    # Selecters
     col1, col2 = st.columns(2)
     
     with col1:
@@ -207,22 +225,34 @@ elif selected == "🔍 Account Segments":
         )
     
     with col2:
-        sort_by = st.selectbox(
-            "Sort By",
-            ["Conversions", "Cost", "CPA"],
-            key="segment_sort"
+        analysis_type = st.selectbox(
+            "Select Analysis",
+            ["📈 Opportunities", "⚠️ Issues", "📊 All Segments"],
+            key="analysis_type"
         )
     
     # Get segment data
     segment_data = insights['segments'][segment_type]
     df_seg = pd.DataFrame(segment_data)
     
-    if sort_by == "Conversions":
-        df_seg = df_seg.sort_values('conversions', ascending=False)
-    elif sort_by == "Cost":
-        df_seg = df_seg.sort_values('cost', ascending=False)
+    # Apply filters based on analysis type
+    opportunity_threshold_low = account_avg_cpa / 1.5  # CPA 1.5x lower
+    issue_threshold_high = account_avg_cpa * 1.5       # CPA 1.5x higher
+    
+    if analysis_type == "📈 Opportunities":
+        # Low CPA (good) with at least 2 conversions
+        df_seg = df_seg[(df_seg['cpa'] <= opportunity_threshold_low) & (df_seg['conversions'] >= 2)]
+        df_seg = df_seg.sort_values('cpa', ascending=True)  # Best first
+        title_suffix = f" - Opportunities (CPA ≤ ₽{opportunity_threshold_low:,.0f})"
+    elif analysis_type == "⚠️ Issues":
+        # High CPA (bad)
+        df_seg = df_seg[df_seg['cpa'] >= issue_threshold_high]
+        df_seg = df_seg.sort_values('cpa', ascending=False)  # Worst first
+        title_suffix = f" - Issues (CPA ≥ ₽{issue_threshold_high:,.0f})"
     else:
-        df_seg = df_seg.sort_values('cpa', ascending=False)
+        # Show all
+        df_seg = df_seg.sort_values('conversions', ascending=False)
+        title_suffix = " - All Segments"
     
     # Stats
     col1, col2, col3, col4 = st.columns(4)
@@ -233,24 +263,31 @@ elif selected == "🔍 Account Segments":
     with col3:
         st.metric("Total Conv", int(df_seg['conversions'].sum()))
     with col4:
-        avg_cpa = df_seg['cost'].sum() / max(df_seg['conversions'].sum(), 1)
-        st.metric("Avg CPA", f"₽{avg_cpa:,.0f}")
+        if len(df_seg) > 0:
+            avg_cpa = df_seg['cost'].sum() / max(df_seg['conversions'].sum(), 1)
+            st.metric("Avg CPA", f"₽{avg_cpa:,.0f}")
+        else:
+            st.metric("Avg CPA", "N/A")
     
     st.divider()
     
-    # Chart
-    fig = px.bar(
-        df_seg.head(10),
-        x='value',
-        y='conversions',
-        color='cpa',
-        hover_data=['cost', 'ctr', 'clicks', 'impressions'],
-        title=f"Top 10 {segment_type} by Conversions"
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Table
-    st.dataframe(df_seg, use_container_width=True)
+    # Show results
+    if len(df_seg) == 0:
+        st.info(f"No {analysis_type} found for {segment_type}")
+    else:
+        # Chart
+        fig = px.bar(
+            df_seg.head(15),
+            x='value',
+            y='conversions',
+            color='cpa',
+            hover_data=['cost', 'ctr', 'clicks', 'impressions'],
+            title=f"Top 15 {segment_type}{title_suffix}"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Table
+        st.dataframe(df_seg, use_container_width=True)
 
 # ============================================================================
 # TAB 3: CAMPAIGNS
@@ -259,17 +296,15 @@ elif selected == "🔍 Account Segments":
 elif selected == "🎯 Campaigns":
     st.markdown("## Per-Campaign Breakdown")
     
-    campaigns_list = campaigns['campaigns']
-    
     col1, col2 = st.columns(2)
     
     with col1:
         campaign_names = [f"{c['campaign_name'][:60]}..." if len(c['campaign_name']) > 60 else c['campaign_name'] 
-                         for c in campaigns_list]
-        selected_idx = st.selectbox("Select Campaign", range(len(campaigns_list)), 
+                         for c in campaigns]
+        selected_idx = st.selectbox("Select Campaign", range(len(campaigns)), 
                                     format_func=lambda i: campaign_names[i])
     
-    campaign = campaigns_list[selected_idx]
+    campaign = campaigns[selected_idx]
     
     with col2:
         segment_type = st.selectbox(
@@ -331,7 +366,7 @@ elif selected == "🎯 Campaigns":
     # All campaigns summary
     with st.expander("📋 All Campaigns Summary"):
         all_camps_data = []
-        for c in campaigns_list:
+        for c in campaigns:
             all_camps_data.append({
                 'Campaign': c['campaign_name'],
                 'Cost': c['stats']['cost'],
