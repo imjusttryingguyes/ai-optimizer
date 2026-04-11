@@ -27,19 +27,18 @@ load_dotenv()  # Will find .env in current directory if exists
 # CONFIG
 # ============================================================================
 
-DB_HOST = os.getenv('DB_HOST', '')
+DB_HOST = os.getenv('DB_HOST')
 DB_PORT = int(os.getenv('DB_PORT', '5432'))
-DB_USER = os.getenv('DB_USER', '')
-DB_PASSWORD = os.getenv('DB_PASSWORD', '')
-DB_NAME = os.getenv('DB_NAME', '')
-YANDEX_TOKEN = os.getenv('YANDEX_TOKEN', '')
-YANDEX_LOGIN = os.getenv('YANDEX_LOGIN', 'mmg-sz')
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_NAME = os.getenv('DB_NAME')
+YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')
+YANDEX_LOGIN = os.getenv('YANDEX_LOGIN')
 
-# Debug: Show which environment variables are loaded
-DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
-if DEBUG_MODE:
-    st.write(f"DEBUG: DB_HOST={DB_HOST or 'NOT SET'}")
-    st.write(f"DEBUG: DB_USER={DB_USER or 'NOT SET'}")
+# Check if all required env vars are set
+if not all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
+    st.error("❌ Missing database configuration. Please add all required Secrets to HF Settings.")
+    st.stop()
 
 st.set_page_config(
     page_title="Phase 4: Аналитика кампаний",
@@ -54,10 +53,46 @@ st.set_page_config(
 
 @st.cache_resource
 def get_db_conn():
-    return psycopg2.connect(
-        host=DB_HOST, port=DB_PORT, user=DB_USER,
-        password=DB_PASSWORD, database=DB_NAME
-    )
+    try:
+        return psycopg2.connect(
+            host=DB_HOST, port=DB_PORT, user=DB_USER,
+            password=DB_PASSWORD, database=DB_NAME
+        )
+    except psycopg2.OperationalError as e:
+        # Диагностируем какие переменные загружены
+        error_msg = f"""
+        ❌ DATABASE CONNECTION ERROR
+        ─────────────────────────────────────────────────────────
+        
+        Loaded environment variables:
+        • DB_HOST: {'✓ ' + DB_HOST if DB_HOST else '✗ EMPTY or NOT SET'}
+        • DB_PORT: {'✓ ' + str(DB_PORT) if DB_PORT else '✗ EMPTY'}
+        • DB_USER: {'✓ ' + DB_USER if DB_USER else '✗ EMPTY'}
+        • DB_PASSWORD: {'✓ (set)' if DB_PASSWORD else '✗ EMPTY'}
+        • DB_NAME: {'✓ ' + DB_NAME if DB_NAME else '✗ EMPTY'}
+        
+        Connection error:
+        {str(e)}
+        
+        ─────────────────────────────────────────────────────────
+        WHAT TO DO:
+        1. If variables are EMPTY - add Repository Secrets to HF
+        2. Settings → Repository secrets → Add these 5 secrets:
+           • DB_HOST = 43.245.224.117
+           • DB_PORT = 5432
+           • DB_USER = aiopt
+           • DB_PASSWORD = strongpassword123
+           • DB_NAME = aiopt
+        3. After adding Secrets, click "Restart" in Settings
+        4. Refresh this page (Ctrl+F5)
+        
+        If variables show ✓ but error persists:
+        - Your database at 43.245.224.117:5432 might be unreachable
+        - Check firewall/network connectivity
+        - Verify database is running
+        """
+        st.error(error_msg)
+        st.stop()
 
 # ============================================================================
 # DATA LOADERS
