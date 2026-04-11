@@ -27,18 +27,19 @@ load_dotenv()  # Will find .env in current directory if exists
 # CONFIG
 # ============================================================================
 
-DB_HOST = os.getenv('DB_HOST')
+DB_HOST = os.getenv('DB_HOST', '')
 DB_PORT = int(os.getenv('DB_PORT', '5432'))
-DB_USER = os.getenv('DB_USER')
-DB_PASSWORD = os.getenv('DB_PASSWORD')
-DB_NAME = os.getenv('DB_NAME')
-YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')
-YANDEX_LOGIN = os.getenv('YANDEX_LOGIN')
+DB_USER = os.getenv('DB_USER', '')
+DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+DB_NAME = os.getenv('DB_NAME', '')
+YANDEX_TOKEN = os.getenv('YANDEX_TOKEN', '')
+YANDEX_LOGIN = os.getenv('YANDEX_LOGIN', 'mmg-sz')
 
-# Check if all required env vars are set
-if not all([DB_HOST, DB_USER, DB_PASSWORD, DB_NAME]):
-    st.error("❌ Missing database configuration. Please add all required Secrets to HF Settings.")
-    st.stop()
+# Debug: Show which environment variables are loaded
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'false').lower() == 'true'
+if DEBUG_MODE:
+    st.write(f"DEBUG: DB_HOST={DB_HOST or 'NOT SET'}")
+    st.write(f"DEBUG: DB_USER={DB_USER or 'NOT SET'}")
 
 st.set_page_config(
     page_title="Phase 4: Аналитика кампаний",
