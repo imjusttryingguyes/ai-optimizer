@@ -16,7 +16,8 @@ from dotenv import load_dotenv
 import psycopg2
 import pandas as pd
 
-sys.path.insert(0, '/opt/ai-optimizer/ingestion')
+# Add extraction dir to path to import yandex_detailed_extract
+sys.path.insert(0, '/opt/ai-optimizer/extraction')
 load_dotenv('/opt/ai-optimizer/.env')
 
 YANDEX_TOKEN = os.getenv('YANDEX_TOKEN')

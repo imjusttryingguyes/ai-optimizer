@@ -1,48 +1,243 @@
 {
-  "account_cpa": 7000,
-  "period_start": "2026-03-13",
-  "period_end": "2026-04-10",
-  "last_updated": "2026-04-11T10:59:00",
+  "generated_at": "2026-04-11T13:13:38.783653",
+  "period_days": 30,
   "summary": {
-    "good_count": 14,
-    "bad_count": 19,
-    "total": 33
+    "good_opportunities": 15,
+    "problems": 8,
+    "total_actionable": 23
   },
-  "good_trends": [
-    {"segment_type": "Device", "segment_value": "Desktop", "cost": 850000, "conversions": 130, "cpa": 6538.46, "ratio": 0.93},
-    {"segment_type": "AdNetworkType", "segment_value": "SEARCH", "cost": 1200000, "conversions": 180, "cpa": 6666.67, "ratio": 0.95},
-    {"segment_type": "AdFormat", "segment_value": "TEXT_AD", "cost": 900000, "conversions": 140, "cpa": 6428.57, "ratio": 0.92},
-    {"segment_type": "Age", "segment_value": "25-34", "cost": 750000, "conversions": 115, "cpa": 6521.74, "ratio": 0.93},
-    {"segment_type": "Age", "segment_value": "35-44", "cost": 650000, "conversions": 100, "cpa": 6500, "ratio": 0.93},
-    {"segment_type": "Gender", "segment_value": "MALE", "cost": 1100000, "conversions": 165, "cpa": 6666.67, "ratio": 0.95},
-    {"segment_type": "IncomeGrade", "segment_value": "HIGH", "cost": 880000, "conversions": 135, "cpa": 6518.52, "ratio": 0.93},
-    {"segment_type": "IncomeGrade", "segment_value": "MEDIUM", "cost": 920000, "conversions": 145, "cpa": 6344.83, "ratio": 0.91},
-    {"segment_type": "CriterionType", "segment_value": "KEYWORD", "cost": 1300000, "conversions": 200, "cpa": 6500, "ratio": 0.93},
-    {"segment_type": "Placement", "segment_value": "yandex.ru", "cost": 700000, "conversions": 108, "cpa": 6481.48, "ratio": 0.93},
-    {"segment_type": "Placement", "segment_value": "google.com", "cost": 450000, "conversions": 70, "cpa": 6428.57, "ratio": 0.92},
-    {"segment_type": "Slot", "segment_value": "PREMIUM", "cost": 620000, "conversions": 95, "cpa": 6526.32, "ratio": 0.93},
-    {"segment_type": "TargetingCategory", "segment_value": "BUSINESS", "cost": 550000, "conversions": 85, "cpa": 6470.59, "ratio": 0.92},
-    {"segment_type": "TargetingLocationName", "segment_value": "Москва", "cost": 480000, "conversions": 75, "cpa": 6400, "ratio": 0.91}
+  "good_opportunities": [
+    {
+      "segment_type": "Device",
+      "segment_value": "DESKTOP",
+      "classification": "good",
+      "cost": 6270.08,
+      "conversions": 97,
+      "cpa": 64.64,
+      "impression_share": 61.1,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "Gender",
+      "segment_value": "MALE",
+      "classification": "good",
+      "cost": 5041.92,
+      "conversions": 78,
+      "cpa": 64.64,
+      "impression_share": 54.6,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "Age",
+      "segment_value": "AGE_18_24",
+      "classification": "good",
+      "cost": 18680.96,
+      "conversions": 289,
+      "cpa": 64.64,
+      "impression_share": 24.5,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "Age",
+      "segment_value": "AGE_45_54",
+      "classification": "good",
+      "cost": 18680.96,
+      "conversions": 289,
+      "cpa": 64.64,
+      "impression_share": 32.0,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "AdFormat",
+      "segment_value": "IMAGE_AD",
+      "classification": "good",
+      "cost": 21331.2,
+      "conversions": 330,
+      "cpa": 64.64,
+      "impression_share": 13.8,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "AdFormat",
+      "segment_value": "RICH_MEDIA_AD",
+      "classification": "good",
+      "cost": 14156.16,
+      "conversions": 219,
+      "cpa": 64.64,
+      "impression_share": 40.3,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "TargetingCategory",
+      "segment_value": "AUTO",
+      "classification": "good",
+      "cost": 19198.08,
+      "conversions": 297,
+      "cpa": 64.64,
+      "impression_share": 16.3,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "TargetingCategory",
+      "segment_value": "BEAUTY",
+      "classification": "good",
+      "cost": 15061.12,
+      "conversions": 233,
+      "cpa": 64.64,
+      "impression_share": 79.3,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "TargetingLocationName",
+      "segment_value": "Екатеринбург",
+      "classification": "good",
+      "cost": 9437.44,
+      "conversions": 146,
+      "cpa": 64.64,
+      "impression_share": 12.7,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "Placement",
+      "segment_value": "CONTENT",
+      "classification": "good",
+      "cost": 15836.8,
+      "conversions": 245,
+      "cpa": 64.64,
+      "impression_share": 34.6,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "Slot",
+      "segment_value": "HIGH",
+      "classification": "good",
+      "cost": 29540.48,
+      "conversions": 457,
+      "cpa": 64.64,
+      "impression_share": 55.8,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "Slot",
+      "segment_value": "FIRST_PAGE_PREM",
+      "classification": "good",
+      "cost": 9308.16,
+      "conversions": 144,
+      "cpa": 64.64,
+      "impression_share": 38.7,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "AdNetworkType",
+      "segment_value": "AD_EXCHANGE",
+      "classification": "good",
+      "cost": 27859.84,
+      "conversions": 431,
+      "cpa": 64.64,
+      "impression_share": 35.6,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "IncomeGrade",
+      "segment_value": "LOW",
+      "classification": "good",
+      "cost": 25597.44,
+      "conversions": 396,
+      "cpa": 64.64,
+      "impression_share": 41.3,
+      "efficiency_vs_avg": 200.0
+    },
+    {
+      "segment_type": "IncomeGrade",
+      "segment_value": "HIGH",
+      "classification": "good",
+      "cost": 6270.08,
+      "conversions": 97,
+      "cpa": 64.64,
+      "impression_share": 67.6,
+      "efficiency_vs_avg": 200.0
+    }
   ],
-  "bad_trends": [
-    {"segment_type": "Device", "segment_value": "Mobile", "cost": 1200000, "conversions": 140, "cpa": 8571.43, "ratio": 1.22},
-    {"segment_type": "Device", "segment_value": "Tablet", "cost": 450000, "conversions": 45, "cpa": 10000, "ratio": 1.43},
-    {"segment_type": "AdNetworkType", "segment_value": "CONTENT", "cost": 980000, "conversions": 100, "cpa": 9800, "ratio": 1.40},
-    {"segment_type": "AdNetworkType", "segment_value": "SOCIAL", "cost": 320000, "conversions": 30, "cpa": 10666.67, "ratio": 1.52},
-    {"segment_type": "AdFormat", "segment_value": "IMAGE_AD", "cost": 280000, "conversions": 25, "cpa": 11200, "ratio": 1.60},
-    {"segment_type": "Age", "segment_value": "18-24", "cost": 350000, "conversions": 32, "cpa": 10937.5, "ratio": 1.56},
-    {"segment_type": "Age", "segment_value": "45-54", "cost": 420000, "conversions": 38, "cpa": 11052.63, "ratio": 1.58},
-    {"segment_type": "Age", "segment_value": "55+", "cost": 500000, "conversions": 25, "cpa": 20000, "ratio": 2.86},
-    {"segment_type": "Gender", "segment_value": "FEMALE", "cost": 650000, "conversions": 60, "cpa": 10833.33, "ratio": 1.55},
-    {"segment_type": "IncomeGrade", "segment_value": "LOW", "cost": 280000, "conversions": 22, "cpa": 12727.27, "ratio": 1.82},
-    {"segment_type": "CriterionType", "segment_value": "AUDIENCE", "cost": 195000, "conversions": 15, "cpa": 13000, "ratio": 1.86},
-    {"segment_type": "Placement", "segment_value": "dzen.ru", "cost": 520000, "conversions": 45, "cpa": 11555.56, "ratio": 1.65},
-    {"segment_type": "Placement", "segment_value": "avito.ru", "cost": 180000, "conversions": 12, "cpa": 15000, "ratio": 2.14},
-    {"segment_type": "Slot", "segment_value": "SIDE", "cost": 340000, "conversions": 28, "cpa": 12142.86, "ratio": 1.73},
-    {"segment_type": "Slot", "segment_value": "GUARANTEE", "cost": 280000, "conversions": 18, "cpa": 15555.56, "ratio": 2.22},
-    {"segment_type": "TargetingCategory", "segment_value": "ENTERTAINMENT", "cost": 250000, "conversions": 18, "cpa": 13888.89, "ratio": 1.98},
-    {"segment_type": "TargetingCategory", "segment_value": "EDUCATION", "cost": 150000, "conversions": 10, "cpa": 15000, "ratio": 2.14},
-    {"segment_type": "TargetingLocationName", "segment_value": "Санкт-Петербург", "cost": 220000, "conversions": 14, "cpa": 15714.29, "ratio": 2.24},
-    {"segment_type": "TargetingLocationName", "segment_value": "Екатеринбург", "cost": 95000, "conversions": 5, "cpa": 19000, "ratio": 2.71}
+  "problems": [
+    {
+      "segment_type": "Age",
+      "segment_value": "AGE_0_17",
+      "classification": "bad",
+      "cost": 8015.36,
+      "conversions": 31,
+      "cpa": 258.56,
+      "impression_share": 27.0,
+      "efficiency_vs_avg": 50.0
+    },
+    {
+      "segment_type": "Age",
+      "segment_value": "AGE_55_PLUS",
+      "classification": "bad",
+      "cost": 5171.2,
+      "conversions": 20,
+      "cpa": 258.56,
+      "impression_share": 25.7,
+      "efficiency_vs_avg": 50.0
+    },
+    {
+      "segment_type": "TargetingCategory",
+      "segment_value": "ELECTRONICS",
+      "classification": "bad",
+      "cost": 775.68,
+      "conversions": 3,
+      "cpa": 258.56,
+      "impression_share": 72.0,
+      "efficiency_vs_avg": 50.0
+    },
+    {
+      "segment_type": "TargetingLocationName",
+      "segment_value": "Москва",
+      "classification": "bad",
+      "cost": 6722.56,
+      "conversions": 26,
+      "cpa": 258.56,
+      "impression_share": 70.6,
+      "efficiency_vs_avg": 50.0
+    },
+    {
+      "segment_type": "Placement",
+      "segment_value": "SEARCH",
+      "classification": "bad",
+      "cost": 7756.8,
+      "conversions": 30,
+      "cpa": 258.56,
+      "impression_share": 31.2,
+      "efficiency_vs_avg": 50.0
+    },
+    {
+      "segment_type": "Slot",
+      "segment_value": "GUARANTEED_FIRST",
+      "classification": "bad",
+      "cost": 6464.0,
+      "conversions": 25,
+      "cpa": 258.56,
+      "impression_share": 29.4,
+      "efficiency_vs_avg": 50.0
+    },
+    {
+      "segment_type": "AdNetworkType",
+      "segment_value": "YANDEX",
+      "classification": "bad",
+      "cost": 6464.0,
+      "conversions": 25,
+      "cpa": 258.56,
+      "impression_share": 40.9,
+      "efficiency_vs_avg": 50.0
+    },
+    {
+      "segment_type": "IncomeGrade",
+      "segment_value": "MEDIUM",
+      "classification": "bad",
+      "cost": 4395.52,
+      "conversions": 17,
+      "cpa": 258.56,
+      "impression_share": 81.0,
+      "efficiency_vs_avg": 50.0
+    }
   ]
 }

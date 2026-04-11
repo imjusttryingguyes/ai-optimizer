@@ -1,172 +1,121 @@
 {
-  "last_updated": "2026-04-11T10:59:00",
-  "period_30d": "2026-03-13_2026-04-10",
-  "period_7d": "2026-04-04_2026-04-10",
-  "account_cpa": 7000,
+  "generated_at": "2026-04-11T13:14:01.229661",
   "campaigns": [
     {
-      "campaign_id": 123456,
-      "campaign_name": "Summer Sale - Search",
-      "campaign_type": "SEARCH",
-      "status": "active",
+      "campaign_id": 1001,
+      "campaign_name": "Брендированные поиски",
       "stats_30d": {
-        "cost": 850000,
-        "conversions": 130,
-        "cpa": 6538.46,
-        "impressions": 125000,
-        "clicks": 8500,
-        "ctr": 6.8
+        "cost": 43708.61,
+        "conversions": 399,
+        "cpa": 109.55,
+        "efficiency": 118.0
       },
       "stats_7d": {
-        "cost": 185000,
-        "conversions": 30,
-        "cpa": 6166.67,
-        "impressions": 28000,
-        "clicks": 1950,
-        "ctr": 6.96
+        "cost": 11941.17,
+        "conversions": 103,
+        "cpa": 115.93,
+        "efficiency": 112.0
       },
-      "stats_7d_prev": {
-        "cost": 172000,
-        "conversions": 26,
-        "cpa": 6615.38,
-        "impressions": 25000,
-        "clicks": 1750,
-        "ctr": 7.0
-      },
-      "dynamics": {
-        "cost_change": 1.08,
-        "cpa_change": 0.93,
-        "conversions_change": 1.15,
-        "trend": "improving"
-      },
+      "trend": "declining",
       "insights": [
-        {"type": "good", "message": "CPA улучшилась на 7% vs предыдущая неделя"},
-        {"type": "good", "message": "Конверсии выросли на 15%"},
-        {"type": "warning", "message": "CTR выше среднего - проверить качество объявлений"}
+        "CPA за 7 дней: 116 выше чем за месяц",
+        "Эффективность снижается",
+        "Бюджет: 11941 РУБ за последние 7 дней"
       ]
     },
     {
-      "campaign_id": 789012,
-      "campaign_name": "Brand Protection - Networks",
-      "campaign_type": "CONTENT",
-      "status": "active",
+      "campaign_id": 1002,
+      "campaign_name": "Товарные объявления",
       "stats_30d": {
-        "cost": 980000,
-        "conversions": 100,
-        "cpa": 9800,
-        "impressions": 450000,
-        "clicks": 22500,
-        "ctr": 5.0
+        "cost": 24041.68,
+        "conversions": 160,
+        "cpa": 150.26,
+        "efficiency": 86.0
       },
       "stats_7d": {
-        "cost": 215000,
-        "conversions": 20,
-        "cpa": 10750,
-        "impressions": 105000,
-        "clicks": 5250,
-        "ctr": 5.0
+        "cost": 4947.98,
+        "conversions": 45,
+        "cpa": 109.96,
+        "efficiency": 118.0
       },
-      "stats_7d_prev": {
-        "cost": 198000,
-        "conversions": 22,
-        "cpa": 9000,
-        "impressions": 95000,
-        "clicks": 4750,
-        "ctr": 5.0
-      },
-      "dynamics": {
-        "cost_change": 1.09,
-        "cpa_change": 1.19,
-        "conversions_change": 0.91,
-        "trend": "declining"
-      },
+      "trend": "improving",
       "insights": [
-        {"type": "bad", "message": "CPA выросла на 19% - требуется оптимизация"},
-        {"type": "bad", "message": "Конверсии упали на 9% - проверить таргетинг"},
-        {"type": "info", "message": "Рассмотрите увеличение ставок на лучшие площадки"}
+        "CPA за 7 дней: 110 ниже чем за месяц",
+        "Эффективность улучшается",
+        "Бюджет: 4948 РУБ за последние 7 дней"
       ]
     },
     {
-      "campaign_id": 345678,
-      "campaign_name": "Retargeting - Desktop",
-      "campaign_type": "SEARCH",
-      "status": "active",
+      "campaign_id": 1003,
+      "campaign_name": "Контент сайта",
       "stats_30d": {
-        "cost": 650000,
-        "conversions": 125,
-        "cpa": 5200,
-        "impressions": 85000,
-        "clicks": 6800,
-        "ctr": 8.0
+        "cost": 64100.35,
+        "conversions": 537,
+        "cpa": 119.37,
+        "efficiency": 108.0
       },
       "stats_7d": {
-        "cost": 142000,
-        "conversions": 32,
-        "cpa": 4437.5,
-        "impressions": 18500,
-        "clicks": 1550,
-        "ctr": 8.38
+        "cost": 12952.02,
+        "conversions": 159,
+        "cpa": 81.46,
+        "efficiency": 159.0
       },
-      "stats_7d_prev": {
-        "cost": 135000,
-        "conversions": 28,
-        "cpa": 4821.43,
-        "impressions": 17500,
-        "clicks": 1480,
-        "ctr": 8.46
-      },
-      "dynamics": {
-        "cost_change": 1.05,
-        "cpa_change": 0.92,
-        "conversions_change": 1.14,
-        "trend": "improving"
-      },
+      "trend": "improving",
       "insights": [
-        {"type": "good", "message": "Лучшая CPA в портфеле (5200 ₽)"},
-        {"type": "good", "message": "CPA улучшилась на 8% - продолжать"},
-        {"type": "good", "message": "Высокий CTR (8%) указывает на хороший таргетинг"}
+        "CPA за 7 дней: 81 ниже чем за месяц",
+        "Эффективность улучшается",
+        "Бюджет: 12952 РУБ за последние 7 дней"
       ]
     },
     {
-      "campaign_id": 901234,
-      "campaign_name": "Mobile App - Social",
-      "campaign_type": "SOCIAL",
-      "status": "active",
+      "campaign_id": 1004,
+      "campaign_name": "Мобильное приложение",
       "stats_30d": {
-        "cost": 320000,
-        "conversions": 30,
-        "cpa": 10666.67,
-        "impressions": 280000,
-        "clicks": 8400,
-        "ctr": 3.0
+        "cost": 84919.84,
+        "conversions": 581,
+        "cpa": 146.16,
+        "efficiency": 88.0
       },
       "stats_7d": {
-        "cost": 68000,
-        "conversions": 5,
-        "cpa": 13600,
-        "impressions": 62000,
-        "clicks": 1860,
-        "ctr": 3.0
+        "cost": 18528.02,
+        "conversions": 126,
+        "cpa": 147.05,
+        "efficiency": 88.0
       },
-      "stats_7d_prev": {
-        "cost": 72000,
-        "conversions": 7,
-        "cpa": 10285.71,
-        "impressions": 68000,
-        "clicks": 2040,
-        "ctr": 3.0
-      },
-      "dynamics": {
-        "cost_change": 0.94,
-        "cpa_change": 1.32,
-        "conversions_change": 0.71,
-        "trend": "declining"
-      },
+      "trend": "declining",
       "insights": [
-        {"type": "bad", "message": "CPA выросла на 32% - критическое снижение эффективности"},
-        {"type": "bad", "message": "Конверсии упали на 29% - требуется срочная диагностика"},
-        {"type": "warning", "message": "Низкий CTR (3%) - рассмотрите обновление креативов"}
+        "CPA за 7 дней: 147 выше чем за месяц",
+        "Эффективность снижается",
+        "Бюджет: 18528 РУБ за последние 7 дней"
+      ]
+    },
+    {
+      "campaign_id": 1005,
+      "campaign_name": "Сезонная акция",
+      "stats_30d": {
+        "cost": 37381.8,
+        "conversions": 292,
+        "cpa": 128.02,
+        "efficiency": 101.0
+      },
+      "stats_7d": {
+        "cost": 9091.05,
+        "conversions": 66,
+        "cpa": 137.74,
+        "efficiency": 94.0
+      },
+      "trend": "declining",
+      "insights": [
+        "CPA за 7 дней: 138 выше чем за месяц",
+        "Эффективность снижается",
+        "Бюджет: 9091 РУБ за последние 7 дней"
       ]
     }
-  ]
+  ],
+  "summary": {
+    "total_campaigns": 5,
+    "improving": 2,
+    "declining": 3,
+    "stable": 0
+  }
 }
