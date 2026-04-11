@@ -283,24 +283,33 @@ elif selected == "🔍 Account Segments":
 # ============================================================================
 
 elif selected == "🎯 Campaigns":
-    st.markdown("## Per-Campaign Breakdown")
+    st.markdown("## Per-Campaign Opportunities & Issues")
     
+    # Calculate account CPA threshold (same as Phase 2)
+    account_total_cost = sum(day['cost'] for day in account_kpi['daily'])
+    account_total_conv = sum(day['conversions'] for day in account_kpi['daily'])
+    account_avg_cpa = account_total_cost / max(account_total_conv, 1)
+    
+    st.markdown(f"*Account CPA: ₽{account_avg_cpa:,.2f}*")
+    
+    # Selectors
     col1, col2 = st.columns(2)
     
     with col1:
         campaign_names = [f"{c['campaign_name'][:60]}..." if len(c['campaign_name']) > 60 else c['campaign_name'] 
                          for c in campaigns]
         selected_idx = st.selectbox("Select Campaign", range(len(campaigns)), 
-                                    format_func=lambda i: campaign_names[i])
-    
-    campaign = campaigns[selected_idx]
+                                    format_func=lambda i: campaign_names[i],
+                                    key="campaign_select")
     
     with col2:
-        segment_type = st.selectbox(
-            "Select Segment Type",
-            list(campaign['segments'].keys()),
-            key="campaign_segment_select"
+        analysis_type = st.selectbox(
+            "Select Analysis",
+            ["📈 Opportunities", "⚠️ Issues", "📊 All Segments"],
+            key="campaign_analysis_type"
         )
+    
+    campaign = campaigns[selected_idx]
     
     # Campaign stats
     stats = campaign['stats']
@@ -317,38 +326,65 @@ elif selected == "🎯 Campaigns":
     
     st.divider()
     
-    # Segment breakdown for campaign
-    segment_data = campaign['segments'][segment_type]
+    # Combine all segments from all segment types for this campaign
+    all_campaign_segments = []
+    for segment_type, segments_list in campaign['segments'].items():
+        for seg_data in segments_list:
+            seg_copy = seg_data.copy()
+            seg_copy['segment_type'] = segment_type
+            all_campaign_segments.append(seg_copy)
     
-    if segment_data:
-        df_camp_seg = pd.DataFrame(segment_data)
-        df_camp_seg = df_camp_seg.sort_values('conversions', ascending=False)
-        
-        # Stats
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Segment Entries", len(df_camp_seg))
-        with col2:
-            st.metric("Total Cost", f"₽{df_camp_seg['cost'].sum():,.0f}")
-        with col3:
-            st.metric("Total Conv", int(df_camp_seg['conversions'].sum()))
-        
-        st.divider()
-        
-        # Chart
-        fig = px.bar(
-            df_camp_seg,
-            x='value',
-            y='conversions',
-            color='cpa',
-            title=f"{segment_type} Breakdown for {campaign['campaign_name'][:40]}"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Table
-        st.dataframe(df_camp_seg, use_container_width=True)
+    df_camp_seg = pd.DataFrame(all_campaign_segments)
+    
+    # Apply filters based on analysis type
+    opportunity_threshold_low = account_avg_cpa / 1.5
+    issue_threshold_high = account_avg_cpa * 1.5
+    
+    if analysis_type == "📈 Opportunities":
+        # Low CPA with at least 2 conversions
+        df_camp_seg = df_camp_seg[(df_camp_seg['cpa'] <= opportunity_threshold_low) & (df_camp_seg['conversions'] >= 2)]
+        df_camp_seg = df_camp_seg.sort_values('cpa', ascending=True)
+        title_text = f"Opportunities (CPA ≤ ₽{opportunity_threshold_low:,.0f})"
+    elif analysis_type == "⚠️ Issues":
+        # High CPA
+        df_camp_seg = df_camp_seg[df_camp_seg['cpa'] >= issue_threshold_high]
+        df_camp_seg = df_camp_seg.sort_values('cpa', ascending=False)
+        title_text = f"Issues (CPA ≥ ₽{issue_threshold_high:,.0f})"
     else:
-        st.info(f"No data for {segment_type} in this campaign")
+        # All segments
+        df_camp_seg = df_camp_seg.sort_values('conversions', ascending=False)
+        title_text = "All Segments"
+    
+    # Stats for filtered segments
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Segment Entries", len(df_camp_seg))
+    with col2:
+        st.metric("Total Cost", f"₽{df_camp_seg['cost'].sum():,.0f}")
+    with col3:
+        st.metric("Total Conv", int(df_camp_seg['conversions'].sum()))
+    with col4:
+        if len(df_camp_seg) > 0:
+            avg_cpa = df_camp_seg['cost'].sum() / max(df_camp_seg['conversions'].sum(), 1)
+            st.metric("Avg CPA", f"₽{avg_cpa:,.0f}")
+        else:
+            st.metric("Avg CPA", "N/A")
+    
+    st.divider()
+    
+    # Show results
+    if len(df_camp_seg) == 0:
+        st.info(f"No {analysis_type} found for this campaign")
+    else:
+        # Prepare display dataframe
+        df_display = df_camp_seg[['segment_type', 'value', 'cost', 'conversions', 'clicks', 'impressions', 'cpa', 'ctr']].copy()
+        df_display.columns = ['Segment Type', 'Segment Value', 'Cost', 'Conversions', 'Clicks', 'Impressions', 'CPA', 'CTR %']
+        df_display['Cost'] = df_display['Cost'].apply(lambda x: f"₽{x:,.0f}")
+        df_display['CPA'] = df_display['CPA'].apply(lambda x: f"₽{x:,.0f}")
+        df_display['CTR %'] = df_display['CTR %'].apply(lambda x: f"{x:.2f}%")
+        
+        st.markdown(f"### {title_text}")
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
     
     st.divider()
     
