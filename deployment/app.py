@@ -1,7 +1,5 @@
-import sys
+#!/usr/bin/env python3
 import os
-sys.path.insert(0, os.path.dirname(__file__))
+os.environ['STREAMLIT_SERVER_HEADLESS'] = 'true'
 
-from ui.dashboard import main
-if __name__ == "__main__":
-    main()
+from dashboard import *

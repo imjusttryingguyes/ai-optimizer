@@ -74,20 +74,25 @@ def fetch_detailed_report(
     report_name: str = "AI-Optimizer Extract"
 ) -> Optional[str]:
     """
-    Fetch detailed report from Yandex Direct API.
+    Fetch detailed report from Yandex Direct API v5.
+    
+    **IMPORTANT API REQUIREMENTS:**
+    - Body must be wrapped in "params" key
+    - ReportName is REQUIRED
+    - IncludeVAT is REQUIRED
     
     Args:
-        token: Yandex Direct API token (from oauthtoken header)
+        token: Yandex Direct API token
         client_login: Client account login
         date_from: Start date (YYYY-MM-DD)
         date_to: End date (YYYY-MM-DD)
-        goal_ids: List of Yandex Metrica goal IDs to aggregate (optional)
+        goal_ids: List of Yandex Metrica goal IDs (optional)
         attribution_models: Attribution models (default: AUTO) - ignored for ACCOUNT_PERFORMANCE_REPORT
         use_sandbox: Use sandbox API endpoint
         max_retries: Max retries before giving up
         retry_sleep_seconds: Sleep between retries
-        report_type: Type of report (ACCOUNT_PERFORMANCE_REPORT, CUSTOM_REPORT, etc.)
-        report_name: Report name for API
+        report_type: Type of report (ACCOUNT_PERFORMANCE_REPORT, CRITERIA_PERFORMANCE_REPORT, etc.)
+        report_name: Report name (must not exceed ~100 chars)
         
     Returns:
         TSV string with report data, or None if error
@@ -109,63 +114,93 @@ def fetch_detailed_report(
     
     # Build field names based on report type
     if report_type == "ACCOUNT_PERFORMANCE_REPORT":
-        # For ACCOUNT_PERFORMANCE_REPORT: only basic fields available
         field_names = [
             "Date",
             "Impressions",
             "Clicks",
             "Cost",
-            "ConvertedClicks",
+            "Conversions",
         ]
-        # Add goal conversions if provided
-        if goal_ids:
-            for goal_id in goal_ids:
-                field_names.append(f"Conversions__{goal_id}__AUTO")
-    else:
-        # For CUSTOM_REPORT: more fields available
+    elif report_type == "CRITERIA_PERFORMANCE_REPORT":
+        # Full list of available fields for criteria report
         field_names = [
             "Date",
             "CampaignId",
             "CampaignName",
+            "CampaignType",
             "AdGroupId",
             "AdGroupName",
-            "Keyword",
             "Impressions",
             "Clicks",
             "Cost",
             "ConvertedClicks",
+            "Conversions",
+            "ConversionRate",
+            "CriterionId",
+            "CriterionType",
+            "Keyword",
+            "KeywordMatchType",
+            "Device",
+            "Gender",
+            "Age",
+            "IncomeGrade",
+            "Placement",
+            "Slot",
+            "AdFormat",
+            "AvgClickPosition",
+            "AvgImpressionPosition",
+            "AvgTrafficVolume",
+            "Bounces",
+            "AdNetworkType",
+            "Query",
+            "TargetingCategory",
+            "TargetingLocationName",
         ]
-        # Add goal conversions if provided
-        if goal_ids:
-            for goal_id in goal_ids:
-                field_names.append(f"Conversions__{goal_id}__AUTO")
+    else:
+        # Default: minimal fields
+        field_names = [
+            "Date",
+            "Cost",
+            "Conversions",
+            "Clicks",
+            "Impressions",
+        ]
     
-    # Prepare request body
-    params = {
-        "SelectionCriteria": {
-            "DateFrom": date_from,
-            "DateTo": date_to,
-        },
-        "FieldNames": field_names,
-        "ReportType": report_type,
-        "ReportName": report_name,
-        "DateRangeType": "CUSTOM_DATE",
-        "Format": "TSV",
-        "IncludeVat": "YES",
-        "IncludeDiscount": "YES",
+    # Add goal conversions if provided
+    if goal_ids:
+        for goal_id in goal_ids:
+            field_names.append(f"Conversions__{goal_id}__AUTO")
+    
+    # Build request body with REQUIRED "params" wrapper
+    body = {
+        "params": {
+            "SelectionCriteria": {
+                "DateFrom": date_from,
+                "DateTo": date_to,
+            },
+            "FieldNames": field_names,
+            "ReportType": report_type,
+            "ReportName": report_name,
+            "DateRangeType": "CUSTOM_DATE",
+            "Format": "TSV",
+            "IncludeVAT": "YES",  # REQUIRED
+        }
     }
     
-    # Request report
-    url = YANDEX_REPORTS_API if not use_sandbox else "https://api-sandbox.direct.yandex.com/json/v5/reports"
+    # Select endpoint
+    url = "https://api.direct.yandex.com/json/v5/reports"
+    if use_sandbox:
+        url = "https://api-sandbox.direct.yandex.com/json/v5/reports"
     
     print(f"    Requesting report: {date_from} to {date_to}")
     
-    # Poll for report completion (Yandex API is async)
+    # Poll for report completion
     for attempt in range(max_retries):
         try:
-            response = requests.post(url, json=params, headers=headers, timeout=60)
+            response = requests.post(url, json=body, headers=headers, timeout=60)
             
             if response.status_code == 200:
+                # Successfully got report data (TSV)
                 return response.text
             
             elif response.status_code == 202:
@@ -175,7 +210,7 @@ def fetch_detailed_report(
                 continue
             
             elif response.status_code == 400:
-                error_msg = response.json().get("error", {}).get("error_string", response.text)
+                error_msg = response.json().get("error", {}).get("error_detail", response.text)
                 print(f"    ❌ Bad request: {error_msg}")
                 return None
             
