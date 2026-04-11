@@ -58,6 +58,37 @@ def get_db_conn():
         password=DB_PASSWORD, database=DB_NAME
     )
 
+
+def execute_query_safe(query, retries=2):
+    """
+    Execute query with automatic retry on connection failure.
+    
+    Handles:
+    - Connection closed by server
+    - Stale connections from cache
+    - Network timeouts
+    """
+    import psycopg2
+    
+    last_error = None
+    for attempt in range(retries):
+        try:
+            conn = get_db_conn()
+            df = execute_query_safe(query)
+            conn.close()
+            return df
+        except (psycopg2.InterfaceError, psycopg2.OperationalError, Exception) as e:
+            last_error = e
+            if attempt < retries - 1:
+                # Try again
+                continue
+            else:
+                # Out of retries
+                raise
+    
+    raise last_error
+
+
 # ============================================================================
 # DATA LOADERS
 # ============================================================================
@@ -71,7 +102,7 @@ def load_account_kpi():
         FROM account_kpi
         ORDER BY date
     """
-    df = pd.read_sql(query, conn)
+    df = execute_query_safe(query)
     conn.close()
     return df
 
@@ -85,7 +116,7 @@ def load_insights():
         FROM segment_trends_30d
         ORDER BY classification DESC, ratio_to_account DESC
     """
-    df = pd.read_sql(query, conn)
+    df = execute_query_safe(query)
     conn.close()
     return df
 
