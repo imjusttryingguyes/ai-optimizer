@@ -2,7 +2,7 @@
   "account_cpa": 7000,
   "period_start": "2026-03-13",
   "period_end": "2026-04-10",
-  "last_updated": "2026-04-11T10:45:00",
+  "last_updated": "2026-04-11T10:59:00",
   "summary": {
     "good_count": 14,
     "bad_count": 19,
@@ -22,7 +22,7 @@
     {"segment_type": "Placement", "segment_value": "google.com", "cost": 450000, "conversions": 70, "cpa": 6428.57, "ratio": 0.92},
     {"segment_type": "Slot", "segment_value": "PREMIUM", "cost": 620000, "conversions": 95, "cpa": 6526.32, "ratio": 0.93},
     {"segment_type": "TargetingCategory", "segment_value": "BUSINESS", "cost": 550000, "conversions": 85, "cpa": 6470.59, "ratio": 0.92},
-    {"segment_type": "TargetingLocationId", "segment_value": "225", "cost": 480000, "conversions": 75, "cpa": 6400, "ratio": 0.91}
+    {"segment_type": "TargetingLocationName", "segment_value": "Москва", "cost": 480000, "conversions": 75, "cpa": 6400, "ratio": 0.91}
   ],
   "bad_trends": [
     {"segment_type": "Device", "segment_value": "Mobile", "cost": 1200000, "conversions": 140, "cpa": 8571.43, "ratio": 1.22},
@@ -42,7 +42,7 @@
     {"segment_type": "Slot", "segment_value": "GUARANTEE", "cost": 280000, "conversions": 18, "cpa": 15555.56, "ratio": 2.22},
     {"segment_type": "TargetingCategory", "segment_value": "ENTERTAINMENT", "cost": 250000, "conversions": 18, "cpa": 13888.89, "ratio": 1.98},
     {"segment_type": "TargetingCategory", "segment_value": "EDUCATION", "cost": 150000, "conversions": 10, "cpa": 15000, "ratio": 2.14},
-    {"segment_type": "TargetingLocationId", "segment_value": "1", "cost": 220000, "conversions": 14, "cpa": 15714.29, "ratio": 2.24},
-    {"segment_type": "TargetingLocationId", "segment_value": "10174", "cost": 95000, "conversions": 5, "cpa": 19000, "ratio": 2.71}
+    {"segment_type": "TargetingLocationName", "segment_value": "Санкт-Петербург", "cost": 220000, "conversions": 14, "cpa": 15714.29, "ratio": 2.24},
+    {"segment_type": "TargetingLocationName", "segment_value": "Екатеринбург", "cost": 95000, "conversions": 5, "cpa": 19000, "ratio": 2.71}
   ]
 }
