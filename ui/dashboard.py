@@ -53,46 +53,10 @@ st.set_page_config(
 
 @st.cache_resource
 def get_db_conn():
-    try:
-        return psycopg2.connect(
-            host=DB_HOST, port=DB_PORT, user=DB_USER,
-            password=DB_PASSWORD, database=DB_NAME
-        )
-    except psycopg2.OperationalError as e:
-        # Диагностируем какие переменные загружены
-        error_msg = f"""
-        ❌ DATABASE CONNECTION ERROR
-        ─────────────────────────────────────────────────────────
-        
-        Loaded environment variables:
-        • DB_HOST: {'✓ ' + DB_HOST if DB_HOST else '✗ EMPTY or NOT SET'}
-        • DB_PORT: {'✓ ' + str(DB_PORT) if DB_PORT else '✗ EMPTY'}
-        • DB_USER: {'✓ ' + DB_USER if DB_USER else '✗ EMPTY'}
-        • DB_PASSWORD: {'✓ (set)' if DB_PASSWORD else '✗ EMPTY'}
-        • DB_NAME: {'✓ ' + DB_NAME if DB_NAME else '✗ EMPTY'}
-        
-        Connection error:
-        {str(e)}
-        
-        ─────────────────────────────────────────────────────────
-        WHAT TO DO:
-        1. If variables are EMPTY - add Repository Secrets to HF
-        2. Settings → Repository secrets → Add these 5 secrets:
-           • DB_HOST = 43.245.224.117
-           • DB_PORT = 5432
-           • DB_USER = aiopt
-           • DB_PASSWORD = strongpassword123
-           • DB_NAME = aiopt
-        3. After adding Secrets, click "Restart" in Settings
-        4. Refresh this page (Ctrl+F5)
-        
-        If variables show ✓ but error persists:
-        - Your database at 43.245.224.117:5432 might be unreachable
-        - Check firewall/network connectivity
-        - Verify database is running
-        """
-        st.error(error_msg)
-        st.stop()
+    return psycopg2.connect(
+        host=DB_HOST, port=DB_PORT, user=DB_USER,
+        password=DB_PASSWORD, database=DB_NAME
+    )
 
 # ============================================================================
 # DATA LOADERS
