@@ -1,0 +1,200 @@
+╔══════════════════════════════════════════════════════════════════╗
+║               PHASE 4 ANALYTICS - QUICK REFERENCE               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+🚀 START DASHBOARD (Most Common)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  $ bash /opt/phase4/start-dashboard-alt.sh
+  
+  Opens: http://localhost:8502
+
+  Then explore:
+  • 📈 Overview - Daily trends & key metrics
+  • 🎯 Insights - 33 segments (good/bad)
+  • 🚀 Campaigns - Drill-down by segment
+
+
+📁 DOCUMENTATION QUICK LINKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+What to read?                           File to open:
+────────────────────────────────────────────────────────────────
+I want to see the dashboard          → RUN-DASHBOARD.md
+I want to understand the system      → README.md
+I need to deploy to production       → DEPLOYMENT.md
+Something is broken                  → TROUBLESHOOTING.md
+Where are all the docs?              → DOCUMENTATION_INDEX.md
+What data do I have?                 → FINAL_STATUS.md
+How do I set up daily updates?       → DEPLOYMENT.md (cron section)
+I want to modify the code            → README.md + source files
+
+
+⚙️ COMMON COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dashboard:
+  bash /opt/phase4/start-dashboard-alt.sh          (Main dashboard, port 8502)
+  streamlit run /opt/phase4/ui/dashboard.py --server.port 8503  (Alt port)
+
+Extraction (Manual):
+  python3 /opt/phase4/extraction/level1_kpi.py     (Daily metrics)
+  python3 /opt/phase4/extraction/level2_trends.py  (Segment insights)
+  python3 /opt/phase4/extraction/level3_campaign_30d.py  (Campaign drill-down)
+
+API:
+  python3 /opt/phase4/api/analytics_api.py         (Start REST API, port 5555)
+  curl http://localhost:5555/api/account/kpi       (Test API endpoint)
+
+Database:
+  psql $DATABASE_URL                               (Direct database access)
+  SELECT COUNT(*) FROM segment_trends_30d;        (Check data volume)
+
+
+📊 CURRENT DATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Расход (30 дней):        2,497,806₽
+Конверсии:               362
+Средний CPA:             6,900₽
+
+Хорошие сегменты:        14 (CPA ≤ 0.67x)
+Плохие сегменты:         19 (CPA ≥ 1.5x)
+
+Топ возможности:
+  1. mail.ru - 0.63x CPA, 61 conv
+  2. VIDEO - 0.65x CPA, 27 conv
+  3. SMART_TV - 0.54x CPA, 10 conv
+
+Топ проблемы:
+  1. RETARGETING - 8.79x CPA, 0 conv
+  2. TABLET - 3.41x CPA, 0 conv
+  3. DESKTOP - 1.81x CPA, 14 conv
+
+
+🔧 IF SOMETHING DOESN'T WORK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dashboard won't open:
+  ├─ Try: bash /opt/phase4/start-dashboard-alt.sh  (port 8502)
+  ├─ Or: streamlit run ui/dashboard.py --server.port 8503
+  └─ Read: TROUBLESHOOTING.md → "Dashboard Won't Start"
+
+Missing dependencies:
+  └─ pip install --break-system-packages plotly pandas streamlit
+
+Database error:
+  └─ cat /opt/ai-optimizer/.env | grep DB_
+
+Extraction failed:
+  └─ tail -f /opt/phase4/logs/level*.log
+
+Can't find answer:
+  └─ Read: TROUBLESHOOTING.md (covers 99% of issues)
+
+
+🎯 TYPICAL WORKFLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Morning (Check overnight data):
+  1. bash /opt/phase4/start-dashboard-alt.sh
+  2. Open http://localhost:8502
+  3. View Insights page
+  4. Identify problem segments
+
+Optimization (Act on insights):
+  1. Click segment → see top campaigns
+  2. Decrease budget for bad performers (❌ red)
+  3. Increase budget for good performers (✅ green)
+  4. Pause campaigns with 0 conversions
+
+Setup (First time):
+  1. Read: /opt/phase4/FINAL_STATUS.md
+  2. Run: bash /opt/phase4/start-dashboard-alt.sh
+  3. Explore 3 pages of dashboard
+  4. Read: /opt/phase4/DEPLOYMENT.md (for production)
+
+
+📈 THREE-LEVEL SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Level 1 (Daily KPI)
+  └─ What: Daily account metrics
+  └─ When: Run at 1 AM daily
+  └─ Data: 30 rows/month
+  └─ File: level1_kpi.py
+
+Level 2 (30-Day Trends)
+  └─ What: Segment insights (opportunities & problems)
+  └─ When: Run at 2 AM daily
+  └─ Data: 33 rows (14 good, 19 bad)
+  └─ File: level2_trends.py
+
+Level 3 (Campaign Drill-Down)
+  └─ What: Top campaigns per segment
+  └─ When: Run at 3 AM daily (optional)
+  └─ Data: ~510 rows/month
+  └─ File: level3_campaign_30d.py
+
+
+📱 REST API ENDPOINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Start API:
+  python3 /opt/phase4/api/analytics_api.py
+
+Endpoints:
+  GET /api/account/kpi
+    ├─ Returns: Daily metrics (30 days)
+    └─ Use: Track overall performance
+
+  GET /api/insights
+    ├─ Returns: All insights (good + bad)
+    └─ Use: Bulk analysis, exports
+
+  GET /api/insights/segment/Device/MOBILE
+    ├─ Returns: Top campaigns for segment
+    └─ Use: Campaign optimization
+
+
+📞 DOCUMENTATION LOCATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All files in: /opt/phase4/
+
+Start with any of these (2-5 min read):
+  • 00-START-HERE.md      (Overview & quick start)
+  • FINAL_STATUS.md       (Current status & data)
+  • RUN-DASHBOARD.md      (How to open dashboard)
+
+For reference (10-30 min read):
+  • README.md             (Full architecture)
+  • DEPLOYMENT.md         (Production setup)
+  • TROUBLESHOOTING.md    (Fix issues)
+
+Navigation:
+  • DOCUMENTATION_INDEX.md  (All docs mapped)
+  • MANIFEST.md             (Complete file inventory)
+
+
+✨ SYSTEM STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Database initialized (PostgreSQL, 4 tables)
+✅ Data loaded (30 days, 2.5M₽)
+✅ Dashboard ready (3 interactive pages)
+✅ API functional (3 endpoints)
+✅ Extraction scripts working (optimized)
+✅ Documentation complete (10+ files)
+✅ All tested & verified
+
+🚀 PRODUCTION READY
+
+
+═══════════════════════════════════════════════════════════════════
+
+NEXT STEP: bash /opt/phase4/start-dashboard-alt.sh
+
+Open: http://localhost:8502
+
+═══════════════════════════════════════════════════════════════════
