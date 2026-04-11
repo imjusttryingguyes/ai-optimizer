@@ -204,36 +204,33 @@ if selected == "📈 Overview":
 # ============================================================================
 
 elif selected == "🔍 Account Segments":
-    st.markdown("## Account-Level Segment Analysis")
+    st.markdown("## Account-Level Opportunities & Issues")
     
     # Calculate account CPA threshold
     account_total_cost = sum(day['cost'] for day in account_kpi['daily'])
     account_total_conv = sum(day['conversions'] for day in account_kpi['daily'])
     account_avg_cpa = account_total_cost / max(account_total_conv, 1)
     
-    st.markdown(f"*Account CPA: ₽{account_avg_cpa:,.2f} (baseline for opportunities/issues)*")
-    st.markdown(f"*Cost threshold: ₽{insights['avg_cpa_threshold']:,.2f}*")
+    st.markdown(f"*Account CPA: ₽{account_avg_cpa:,.2f}*")
+    st.markdown(f"*Opportunities threshold: CPA ≤ ₽{account_avg_cpa/1.5:,.0f} (with ≥2 conversions)*")
+    st.markdown(f"*Issues threshold: CPA ≥ ₽{account_avg_cpa*1.5:,.0f}*")
     
-    # Selecters
-    col1, col2 = st.columns(2)
+    # Single selector
+    analysis_type = st.selectbox(
+        "Select Analysis",
+        ["📈 Opportunities", "⚠️ Issues"],
+        key="analysis_type"
+    )
     
-    with col1:
-        segment_type = st.selectbox(
-            "Select Segment Type",
-            list(insights['segments'].keys()),
-            key="segment_select"
-        )
+    # Combine all segments from all segment types
+    all_segments = []
+    for segment_type, segments_list in insights['segments'].items():
+        for seg_data in segments_list:
+            seg_copy = seg_data.copy()
+            seg_copy['segment_type'] = segment_type
+            all_segments.append(seg_copy)
     
-    with col2:
-        analysis_type = st.selectbox(
-            "Select Analysis",
-            ["📈 Opportunities", "⚠️ Issues", "📊 All Segments"],
-            key="analysis_type"
-        )
-    
-    # Get segment data
-    segment_data = insights['segments'][segment_type]
-    df_seg = pd.DataFrame(segment_data)
+    df_seg = pd.DataFrame(all_segments)
     
     # Apply filters based on analysis type
     opportunity_threshold_low = account_avg_cpa / 1.5  # CPA 1.5x lower
@@ -243,21 +240,17 @@ elif selected == "🔍 Account Segments":
         # Low CPA (good) with at least 2 conversions
         df_seg = df_seg[(df_seg['cpa'] <= opportunity_threshold_low) & (df_seg['conversions'] >= 2)]
         df_seg = df_seg.sort_values('cpa', ascending=True)  # Best first
-        title_suffix = f" - Opportunities (CPA ≤ ₽{opportunity_threshold_low:,.0f})"
-    elif analysis_type == "⚠️ Issues":
+        title_text = f"Opportunities (CPA ≤ ₽{opportunity_threshold_low:,.0f})"
+    else:  # Issues
         # High CPA (bad)
         df_seg = df_seg[df_seg['cpa'] >= issue_threshold_high]
         df_seg = df_seg.sort_values('cpa', ascending=False)  # Worst first
-        title_suffix = f" - Issues (CPA ≥ ₽{issue_threshold_high:,.0f})"
-    else:
-        # Show all
-        df_seg = df_seg.sort_values('conversions', ascending=False)
-        title_suffix = " - All Segments"
+        title_text = f"Issues (CPA ≥ ₽{issue_threshold_high:,.0f})"
     
     # Stats
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Entries", len(df_seg))
+        st.metric("Total Entries", len(df_seg))
     with col2:
         st.metric("Total Cost", f"₽{df_seg['cost'].sum():,.0f}")
     with col3:
@@ -273,21 +266,17 @@ elif selected == "🔍 Account Segments":
     
     # Show results
     if len(df_seg) == 0:
-        st.info(f"No {analysis_type} found for {segment_type}")
+        st.info(f"No {analysis_type} found across all segment types")
     else:
-        # Chart
-        fig = px.bar(
-            df_seg.head(15),
-            x='value',
-            y='conversions',
-            color='cpa',
-            hover_data=['cost', 'ctr', 'clicks', 'impressions'],
-            title=f"Top 15 {segment_type}{title_suffix}"
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        # Prepare display dataframe
+        df_display = df_seg[['segment_type', 'value', 'cost', 'conversions', 'clicks', 'impressions', 'cpa', 'ctr']].copy()
+        df_display.columns = ['Segment Type', 'Segment Value', 'Cost', 'Conversions', 'Clicks', 'Impressions', 'CPA', 'CTR %']
+        df_display['Cost'] = df_display['Cost'].apply(lambda x: f"₽{x:,.0f}")
+        df_display['CPA'] = df_display['CPA'].apply(lambda x: f"₽{x:,.0f}")
+        df_display['CTR %'] = df_display['CTR %'].apply(lambda x: f"{x:.2f}%")
         
-        # Table
-        st.dataframe(df_seg, use_container_width=True)
+        st.markdown(f"### {title_text}")
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
 
 # ============================================================================
 # TAB 3: CAMPAIGNS
