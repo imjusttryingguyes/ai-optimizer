@@ -91,12 +91,8 @@ jobs:
                   print(f"✅ {file_path} updated via GitHub API")
               else:
                   print(f"❌ Error updating {file_path}: {r.text}")
+          
+          print("\n   HF Space will auto-sync when it detects the changes")
           PYTHON
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Trigger HF Space sync
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.HF_API_TOKEN }}" \
-            https://huggingface.co/api/spaces/SamShal1/phase4-analytics/runtime/restart
