@@ -365,6 +365,10 @@ def stage3_extract_campaigns_with_segments(avg_cpa):
                 continue
             
             # Group by segment field, THEN filter by Cost > threshold
+            # NOTE: If campaign uses only 1 value for a segment (e.g., only IMAGE, no TEXT/VIDEO),
+            # then grouping by that field returns 1 row with all campaign metrics.
+            # This is expected behavior, not a bug. Each segment breakdown shows all metrics
+            # that campaign actually uses for that segment type.
             try:
                 grouped = campaign_df.groupby(seg_field, dropna=False).agg({
                     'Cost': 'sum',

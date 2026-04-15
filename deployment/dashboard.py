@@ -161,51 +161,24 @@ if selected == "📈 Overview":
     
     st.divider()
     
-    # Daily chart
+    # Daily chart - two separate charts with proper scaling
     daily_data = pd.DataFrame(account_kpi['daily'])
     daily_data['date'] = pd.to_datetime(daily_data['date'])
     daily_data['cost'] = pd.to_numeric(daily_data['cost'], errors='coerce')
     daily_data['conversions'] = pd.to_numeric(daily_data['conversions'], errors='coerce')
-    daily_data = daily_data.sort_values('date')
+    daily_data = daily_data.sort_values('date').reset_index(drop=True)
     
-    fig = go.Figure()
+    # Chart 1: Cost only
+    st.subheader('Daily Performance - Cost')
+    cost_data = daily_data.set_index('date')[['cost']]
+    cost_data.columns = ['Cost (RUB)']
+    st.line_chart(cost_data, use_container_width=True)
     
-    fig.add_trace(go.Scatter(
-        x=daily_data['date'],
-        y=daily_data['cost'],
-        name='Cost (RUB)',
-        yaxis='y',
-        line=dict(color='#FF6B6B', width=2),
-        hovertemplate='<b>%{x}</b><br>Cost: ₽%{y:,.0f}<extra></extra>'
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=daily_data['date'],
-        y=daily_data['conversions'],
-        name='Conversions',
-        yaxis='y2',
-        line=dict(color='#4ECDC4', width=2),
-        hovertemplate='<b>%{x}</b><br>Conversions: %{y:.0f}<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title='Daily Performance',
-        xaxis_title='Date',
-        yaxis=dict(
-            title='Cost (RUB)',
-            range=[67000, 213000]  # Explicit range for Cost
-        ),
-        yaxis2=dict(
-            title='Conversions',
-            overlaying='y',
-            side='right',
-            range=[0, 35]  # Explicit range for Conversions
-        ),
-        hovermode='x unified',
-        height=400
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
+    # Chart 2: Conversions only
+    st.subheader('Daily Performance - Conversions')
+    conv_data = daily_data.set_index('date')[['conversions']]
+    conv_data.columns = ['Conversions']
+    st.line_chart(conv_data, use_container_width=True)
     
     # Daily table
     with st.expander("📋 Daily Details"):
