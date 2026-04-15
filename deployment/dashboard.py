@@ -173,7 +173,7 @@ if selected == "📈 Overview":
         y=daily_data['cost'],
         name='Cost (RUB)',
         yaxis='y',
-        line=dict(color='#FF6B6B')
+        line=dict(color='#FF6B6B', width=2)
     ))
     
     fig.add_trace(go.Scatter(
@@ -181,14 +181,29 @@ if selected == "📈 Overview":
         y=daily_data['conversions'],
         name='Conversions',
         yaxis='y2',
-        line=dict(color='#4ECDC4')
+        line=dict(color='#4ECDC4', width=2)
     ))
+    
+    # Calculate axis ranges with some padding
+    cost_min, cost_max = daily_data['cost'].min(), daily_data['cost'].max()
+    conv_min, conv_max = daily_data['conversions'].min(), daily_data['conversions'].max()
+    
+    cost_range = cost_max - cost_min
+    conv_range = conv_max - conv_min
     
     fig.update_layout(
         title='Daily Performance',
         xaxis_title='Date',
-        yaxis_title='Cost (RUB)',
-        yaxis2=dict(title='Conversions', overlaying='y', side='right'),
+        yaxis=dict(
+            title='Cost (RUB)',
+            range=[cost_min - cost_range*0.1, cost_max + cost_range*0.1]
+        ),
+        yaxis2=dict(
+            title='Conversions',
+            overlaying='y',
+            side='right',
+            range=[conv_min - conv_range*0.1, conv_max + conv_range*0.1]
+        ),
         hovermode='x unified',
         height=400
     )
