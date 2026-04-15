@@ -164,6 +164,8 @@ if selected == "📈 Overview":
     # Daily chart
     daily_data = pd.DataFrame(account_kpi['daily'])
     daily_data['date'] = pd.to_datetime(daily_data['date'])
+    daily_data['cost'] = pd.to_numeric(daily_data['cost'], errors='coerce')
+    daily_data['conversions'] = pd.to_numeric(daily_data['conversions'], errors='coerce')
     daily_data = daily_data.sort_values('date')
     
     fig = go.Figure()
