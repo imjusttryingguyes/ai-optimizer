@@ -123,8 +123,11 @@ def stage1_extract_daily():
     print(f"Target goals: {TARGET_GOALS}")
     print("="*70)
     
-    date_to = datetime(2026, 4, 10)
+    # Dynamic date range: last 30 days from today
+    date_to = datetime.now().date()
     date_from = date_to - timedelta(days=30)
+    
+    print(f"Date range: {date_from} to {date_to}\n")
     
     selection_criteria = {
         "DateFrom": date_from.strftime('%Y-%m-%d'),
@@ -176,8 +179,11 @@ def stage2_extract_segments_by_filter(avg_cpa):
     print(f"STAGE 2: Extract segments with Cost > {avg_cpa:,.2f} filter")
     print("="*70)
     
-    date_to = datetime(2026, 4, 10)
+    # Dynamic date range: last 7 days from today
+    date_to = datetime.now().date()
     date_from = date_to - timedelta(days=7)  # Last 7 days
+    
+    print(f"Date range: {date_from} to {date_to}\n")
     
     segments_data = {}
     
@@ -252,14 +258,17 @@ def stage3_extract_campaigns_with_segments(avg_cpa):
     print(f"STAGE 3: Extract segments PER CAMPAIGN with Cost > {avg_cpa:,.2f}")
     print("="*70)
     
-    date_to = datetime(2026, 4, 10)
+    # Dynamic date range: last 30 days from today
+    date_to = datetime.now().date()
     date_from = date_to - timedelta(days=30)
+    
+    print(f"Date range: {date_from} to {date_to}\n")
     
     # Convert threshold to micros (API expects micros, not rubles)
     cost_threshold_micros = int(avg_cpa * 1_000_000)
     
     # Get campaign data with segments where ANY segment has Cost > threshold
-    print(f"\n📥 Loading campaigns with segment breakdowns...")
+    print(f"📥 Loading campaigns with segment breakdowns...")
     
     selection_criteria = {
         "DateFrom": date_from.strftime('%Y-%m-%d'),
