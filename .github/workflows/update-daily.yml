@@ -36,6 +36,9 @@ jobs:
       
       - name: Extract daily data (Tab 1)
         run: |
+          echo "🔍 DEBUG: Current date and time"
+          python3 -c "from datetime import datetime, timedelta; dt = datetime.now().date(); print(f'Today: {dt}'); print(f'30 days ago: {dt - timedelta(days=30)}')"
+          echo ""
           python extraction/extract_correct.py stage1
       
       - name: Update results via GitHub API
