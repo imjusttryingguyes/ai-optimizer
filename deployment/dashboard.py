@@ -19,6 +19,9 @@ import plotly.graph_objects as go
 import plotly.express as px
 from streamlit_option_menu import option_menu
 
+# File modification tracking for cache busting
+_file_mtimes = {}
+
 # ============================================================================
 # CONFIG
 # ============================================================================
@@ -49,9 +52,9 @@ def find_json_file(filename):
             return filepath
     return None
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60, show_spinner=False)  # Cache for 1 minute only
 def load_account_kpi():
-    """Load account KPI (Stage 1)."""
+    """Load account KPI (Stage 1). Cache bust if file modified."""
     filepath = find_json_file('account_kpi.json')
     
     if not filepath:
@@ -59,15 +62,21 @@ def load_account_kpi():
         return None
     
     try:
+        # Check file modification time to detect updates
+        mtime = os.path.getmtime(filepath)
+        if filepath in _file_mtimes and _file_mtimes[filepath] != mtime:
+            st.rerun()  # Force rerun if file was updated
+        _file_mtimes[filepath] = mtime
+        
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
         st.error(f"❌ Error loading account_kpi.json: {str(e)}")
         return None
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60, show_spinner=False)  # Cache for 1 minute only
 def load_insights():
-    """Load insights (Stage 2)."""
+    """Load insights (Stage 2). Cache bust if file modified."""
     filepath = find_json_file('insights.json')
     
     if not filepath:
@@ -75,15 +84,20 @@ def load_insights():
         return None
     
     try:
+        mtime = os.path.getmtime(filepath)
+        if filepath in _file_mtimes and _file_mtimes[filepath] != mtime:
+            st.rerun()
+        _file_mtimes[filepath] = mtime
+        
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
         st.error(f"❌ Error loading insights.json: {str(e)}")
         return None
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60, show_spinner=False)  # Cache for 1 minute only
 def load_campaigns():
-    """Load campaigns (Stage 3)."""
+    """Load campaigns (Stage 3). Cache bust if file modified."""
     filepath = find_json_file('campaigns.json')
     
     if not filepath:
