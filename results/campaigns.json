@@ -3,7 +3,7 @@
   "campaigns": [
     {
       "campaign_id": "707986487",
-      "campaign_name": "kedritsa/shop_sn/0/Москва_МО/shop/DM/text/0/0/test",
+      "campaign_name": "kedritsa/shop_sn/0/\u041c\u043e\u0441\u043a\u0432\u0430_\u041c\u041e/shop/DM/text/0/0/test",
       "stats": {
         "cost": 125127.36,
         "conversions": 27,
@@ -171,7 +171,7 @@
     },
     {
       "campaign_id": "702212305",
-      "campaign_name": "kedritsa/shop_manual_script_v2/0/Москва_МО/shop/DM/text/0/0/test",
+      "campaign_name": "kedritsa/shop_manual_script_v2/0/\u041c\u043e\u0441\u043a\u0432\u0430_\u041c\u041e/shop/DM/text/0/0/test",
       "stats": {
         "cost": 185819.16,
         "conversions": 26,
@@ -357,7 +357,7 @@
     },
     {
       "campaign_id": "102080970",
-      "campaign_name": "performance/max/0/Москва_МО/smart_search/DM/text/0/0/0",
+      "campaign_name": "performance/max/0/\u041c\u043e\u0441\u043a\u0432\u0430_\u041c\u041e/smart_search/DM/text/0/0/0",
       "stats": {
         "cost": 19017.26,
         "conversions": 4,
@@ -771,7 +771,7 @@
     },
     {
       "campaign_id": "42704553",
-      "campaign_name": "brand/gen/0/Москва_МО/SE/DM/text/0/0/segment_brand",
+      "campaign_name": "brand/gen/0/\u041c\u043e\u0441\u043a\u0432\u0430_\u041c\u041e/SE/DM/text/0/0/segment_brand",
       "stats": {
         "cost": 10987.68,
         "conversions": 2,
@@ -1044,7 +1044,7 @@
     },
     {
       "campaign_id": "704537707",
-      "campaign_name": "kedritsa_land_new/shop_manual_script_v2/0/Москва_МО/shop/DM/text/0/0/test",
+      "campaign_name": "kedritsa_land_new/shop_manual_script_v2/0/\u041c\u043e\u0441\u043a\u0432\u0430_\u041c\u041e/shop/DM/text/0/0/test",
       "stats": {
         "cost": 9243.24,
         "conversions": 0,
@@ -1169,5 +1169,6 @@
   "summary": {
     "total_campaigns": 8,
     "avg_cpa_threshold": 7995.64
-  }
+  },
+  "_version": 1776261855
 }
