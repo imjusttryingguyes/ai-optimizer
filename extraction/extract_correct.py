@@ -123,8 +123,8 @@ def stage1_extract_daily():
     print(f"Target goals: {TARGET_GOALS}")
     print("="*70)
     
-    # Dynamic date range: last 30 days from today
-    date_to = datetime.now().date()
+    # Dynamic date range: last 30 days (exclude today - stat might be incomplete)
+    date_to = (datetime.now() - timedelta(days=1)).date()
     date_from = date_to - timedelta(days=30)
     
     print(f"Date range: {date_from} to {date_to}\n")
@@ -179,8 +179,8 @@ def stage2_extract_segments_by_filter(avg_cpa):
     print(f"STAGE 2: Extract segments with Cost > {avg_cpa:,.2f} filter")
     print("="*70)
     
-    # Dynamic date range: last 7 days from today
-    date_to = datetime.now().date()
+    # Dynamic date range: last 7 days (exclude today - stat might be incomplete)
+    date_to = (datetime.now() - timedelta(days=1)).date()
     date_from = date_to - timedelta(days=7)  # Last 7 days
     
     print(f"Date range: {date_from} to {date_to}\n")
@@ -258,8 +258,8 @@ def stage3_extract_campaigns_with_segments(avg_cpa):
     print(f"STAGE 3: Extract segments PER CAMPAIGN with Cost > {avg_cpa:,.2f}")
     print("="*70)
     
-    # Dynamic date range: last 30 days from today
-    date_to = datetime.now().date()
+    # Dynamic date range: last 30 days (exclude today - stat might be incomplete)
+    date_to = (datetime.now() - timedelta(days=1)).date()
     date_from = date_to - timedelta(days=30)
     
     print(f"Date range: {date_from} to {date_to}\n")
