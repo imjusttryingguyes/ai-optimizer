@@ -4,7 +4,11 @@ on:
   schedule:
     # Every Monday at 01:00 UTC (Sunday 23:00 → Monday 01:00)
     - cron: '0 1 * * 1'
-  workflow_dispatch:  # Manual trigger for testing
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  repository-projects: read
 
 jobs:
   update-data:
@@ -36,11 +40,13 @@ jobs:
       
       - name: Commit and push results
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add results/
           git diff --cached --quiet || git commit -m "📊 Auto-update: Full data extraction (Tabs 1-3) - $(date -u +'%Y-%m-%d %H:%M UTC')"
-          git push
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Trigger HF Space sync
         run: |
