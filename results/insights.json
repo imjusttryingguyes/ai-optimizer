@@ -1,487 +1,523 @@
 {
-  "generated_at": "2026-04-11T17:24:54.079967",
+  "generated_at": "2026-04-15T15:53:32.710835",
   "period_days": 31,
-  "avg_cpa_threshold": 8435.63,
+  "avg_cpa_threshold": 7995.64,
   "segments": {
     "AdFormat": [
       {
         "value": "IMAGE",
-        "cost": 615730.41,
-        "conversions": 72,
-        "clicks": 16161,
-        "impressions": 1948743,
-        "cpa": 8551.81,
-        "ctr": 0.83
+        "cost": 614119.74,
+        "conversions": 109,
+        "clicks": 14202,
+        "impressions": 1576569,
+        "cpa": 5634.13,
+        "ctr": 0.9
       },
       {
         "value": "SMART_SINGLE",
-        "cost": 52665.14,
-        "conversions": 14,
-        "clicks": 1205,
-        "impressions": 85440,
-        "cpa": 3761.8,
-        "ctr": 1.41
+        "cost": 57107.01,
+        "conversions": 11,
+        "clicks": 1032,
+        "impressions": 89611,
+        "cpa": 5191.55,
+        "ctr": 1.15
       },
       {
         "value": "TEXT",
-        "cost": 249691.6,
-        "conversions": 32,
-        "clicks": 2503,
-        "impressions": 145718,
-        "cpa": 7802.86,
-        "ctr": 1.72
+        "cost": 247186.65,
+        "conversions": 29,
+        "clicks": 2445,
+        "impressions": 144156,
+        "cpa": 8523.68,
+        "ctr": 1.7
       },
       {
         "value": "VIDEO",
-        "cost": 60219.03,
-        "conversions": 11,
-        "clicks": 13216,
-        "impressions": 120867,
-        "cpa": 5474.46,
-        "ctr": 10.93
+        "cost": 65194.35,
+        "conversions": 8,
+        "clicks": 7563,
+        "impressions": 109404,
+        "cpa": 8149.29,
+        "ctr": 6.91
       },
       {
         "value": "multicard",
-        "cost": 13841.49,
+        "cost": 16902.99,
         "conversions": 1,
-        "clicks": 582,
-        "impressions": 126597,
-        "cpa": 13841.49,
-        "ctr": 0.46
+        "clicks": 571,
+        "impressions": 83031,
+        "cpa": 16902.99,
+        "ctr": 0.69
       }
     ],
     "AdNetworkType": [
       {
         "value": "AD_NETWORK",
-        "cost": 610714.02,
-        "conversions": 89,
-        "clicks": 30153,
-        "impressions": 2361582,
-        "cpa": 6861.96,
-        "ctr": 1.28
+        "cost": 638066.74,
+        "conversions": 111,
+        "clicks": 22418,
+        "impressions": 1940806,
+        "cpa": 5748.35,
+        "ctr": 1.16
       },
       {
         "value": "SEARCH",
-        "cost": 381433.64,
-        "conversions": 41,
-        "clicks": 3514,
-        "impressions": 65783,
-        "cpa": 9303.26,
-        "ctr": 5.34
+        "cost": 362444.0,
+        "conversions": 47,
+        "clicks": 3395,
+        "impressions": 61965,
+        "cpa": 7711.57,
+        "ctr": 5.48
       }
     ],
     "Age": [
       {
         "value": "AGE_18_24",
-        "cost": 49439.79,
-        "conversions": 6,
-        "clicks": 2143,
-        "impressions": 147775,
-        "cpa": 8239.97,
-        "ctr": 1.45
+        "cost": 53643.82,
+        "conversions": 11,
+        "clicks": 1358,
+        "impressions": 157847,
+        "cpa": 4876.71,
+        "ctr": 0.86
       },
       {
         "value": "AGE_25_34",
-        "cost": 215510.66,
-        "conversions": 33,
-        "clicks": 6438,
-        "impressions": 693739,
-        "cpa": 6530.63,
-        "ctr": 0.93
+        "cost": 197632.23,
+        "conversions": 36,
+        "clicks": 4528,
+        "impressions": 505750,
+        "cpa": 5489.78,
+        "ctr": 0.9
       },
       {
         "value": "AGE_35_44",
-        "cost": 242758.4,
-        "conversions": 25,
-        "clicks": 7311,
-        "impressions": 610593,
-        "cpa": 9710.34,
-        "ctr": 1.2
+        "cost": 236874.36,
+        "conversions": 31,
+        "clicks": 5373,
+        "impressions": 410967,
+        "cpa": 7641.11,
+        "ctr": 1.31
       },
       {
         "value": "AGE_45_54",
-        "cost": 219065.23,
-        "conversions": 19,
-        "clicks": 5655,
-        "impressions": 247565,
-        "cpa": 11529.75,
-        "ctr": 2.28
+        "cost": 219807.53,
+        "conversions": 32,
+        "clicks": 4719,
+        "impressions": 267814,
+        "cpa": 6868.99,
+        "ctr": 1.76
       },
       {
         "value": "AGE_55",
-        "cost": 195168.19,
-        "conversions": 35,
-        "clicks": 7846,
-        "impressions": 453753,
-        "cpa": 5576.23,
-        "ctr": 1.73
+        "cost": 222260.97,
+        "conversions": 38,
+        "clicks": 6478,
+        "impressions": 393227,
+        "cpa": 5848.97,
+        "ctr": 1.65
       },
       {
         "value": "UNKNOWN",
-        "cost": 70205.4,
-        "conversions": 12,
-        "clicks": 4274,
-        "impressions": 273940,
-        "cpa": 5850.45,
-        "ctr": 1.56
+        "cost": 70291.83,
+        "conversions": 10,
+        "clicks": 3357,
+        "impressions": 267166,
+        "cpa": 7029.18,
+        "ctr": 1.26
       }
     ],
     "CriterionType": [
       {
         "value": "AUTOTARGETING",
-        "cost": 796410.87,
-        "conversions": 111,
-        "clicks": 27646,
-        "impressions": 984483,
-        "cpa": 7174.87,
-        "ctr": 2.81
+        "cost": 848904.13,
+        "conversions": 131,
+        "clicks": 21587,
+        "impressions": 1021846,
+        "cpa": 6480.18,
+        "ctr": 2.11
       },
       {
         "value": "FEED_FILTER",
-        "cost": 31540.25,
-        "conversions": 7,
-        "clicks": 675,
-        "impressions": 68981,
-        "cpa": 4505.75,
-        "ctr": 0.98
+        "cost": 29214.27,
+        "conversions": 8,
+        "clicks": 553,
+        "impressions": 62753,
+        "cpa": 3651.78,
+        "ctr": 0.88
       },
       {
         "value": "KEYWORD",
-        "cost": 143647.02,
-        "conversions": 11,
-        "clicks": 4978,
-        "impressions": 1326178,
-        "cpa": 13058.82,
-        "ctr": 0.38
+        "cost": 76503.19,
+        "conversions": 9,
+        "clicks": 2891,
+        "impressions": 824732,
+        "cpa": 8500.35,
+        "ctr": 0.35
       },
       {
         "value": "OFFER_RETARGETING",
-        "cost": 19180.07,
-        "conversions": 1,
-        "clicks": 322,
-        "impressions": 38997,
-        "cpa": 19180.07,
-        "ctr": 0.83
+        "cost": 44603.27,
+        "conversions": 9,
+        "clicks": 715,
+        "impressions": 80729,
+        "cpa": 4955.92,
+        "ctr": 0.89
       }
     ],
     "Device": [
       {
         "value": "DESKTOP",
-        "cost": 287172.56,
-        "conversions": 23,
-        "clicks": 5407,
-        "impressions": 1105675,
-        "cpa": 12485.76,
-        "ctr": 0.49
+        "cost": 246714.32,
+        "conversions": 34,
+        "clicks": 3647,
+        "impressions": 626362,
+        "cpa": 7256.3,
+        "ctr": 0.58
       },
       {
         "value": "MOBILE",
-        "cost": 680835.16,
-        "conversions": 102,
-        "clicks": 25484,
-        "impressions": 715045,
-        "cpa": 6674.85,
-        "ctr": 3.56
+        "cost": 724466.8,
+        "conversions": 118,
+        "clicks": 19621,
+        "impressions": 724348,
+        "cpa": 6139.55,
+        "ctr": 2.71
       },
       {
         "value": "SMART_TV",
-        "cost": 14882.05,
-        "conversions": 4,
-        "clicks": 1684,
-        "impressions": 589701,
-        "cpa": 3720.51,
-        "ctr": 0.29
+        "cost": 17399.23,
+        "conversions": 3,
+        "clicks": 1688,
+        "impressions": 633208,
+        "cpa": 5799.74,
+        "ctr": 0.27
       },
       {
         "value": "TABLET",
-        "cost": 9257.9,
-        "conversions": 1,
-        "clicks": 1092,
-        "impressions": 16944,
-        "cpa": 9257.9,
-        "ctr": 6.44
+        "cost": 11930.39,
+        "conversions": 3,
+        "clicks": 857,
+        "impressions": 18853,
+        "cpa": 3976.8,
+        "ctr": 4.55
       }
     ],
     "Gender": [
       {
         "value": "GENDER_FEMALE",
-        "cost": 466866.57,
-        "conversions": 53,
-        "clicks": 14689,
-        "impressions": 1012670,
-        "cpa": 8808.8,
-        "ctr": 1.45
+        "cost": 471651.11,
+        "conversions": 80,
+        "clicks": 11657,
+        "impressions": 876537,
+        "cpa": 5895.64,
+        "ctr": 1.33
       },
       {
         "value": "GENDER_MALE",
-        "cost": 469270.83,
-        "conversions": 68,
-        "clicks": 15727,
-        "impressions": 1158214,
-        "cpa": 6901.04,
-        "ctr": 1.36
+        "cost": 473872.15,
+        "conversions": 72,
+        "clicks": 11541,
+        "impressions": 874161,
+        "cpa": 6581.56,
+        "ctr": 1.32
       },
       {
         "value": "UNKNOWN",
-        "cost": 56010.27,
-        "conversions": 9,
-        "clicks": 3251,
-        "impressions": 256481,
-        "cpa": 6223.36,
-        "ctr": 1.27
+        "cost": 54987.48,
+        "conversions": 6,
+        "clicks": 2615,
+        "impressions": 252073,
+        "cpa": 9164.58,
+        "ctr": 1.04
       }
     ],
     "IncomeGrade": [
       {
         "value": "ABOVE_AVERAGE",
-        "cost": 114559.43,
-        "conversions": 4,
-        "clicks": 1879,
-        "impressions": 151389,
-        "cpa": 28639.86,
-        "ctr": 1.24
+        "cost": 120856.73,
+        "conversions": 13,
+        "clicks": 1732,
+        "impressions": 145862,
+        "cpa": 9296.67,
+        "ctr": 1.19
       },
       {
         "value": "HIGH",
-        "cost": 185528.21,
-        "conversions": 22,
-        "clicks": 2275,
-        "impressions": 197549,
-        "cpa": 8433.1,
-        "ctr": 1.15
+        "cost": 185754.34,
+        "conversions": 23,
+        "clicks": 2241,
+        "impressions": 204349,
+        "cpa": 8076.28,
+        "ctr": 1.1
       },
       {
         "value": "OTHER",
-        "cost": 608576.14,
-        "conversions": 90,
-        "clicks": 28763,
-        "impressions": 2007260,
-        "cpa": 6761.96,
-        "ctr": 1.43
+        "cost": 614781.9,
+        "conversions": 106,
+        "clicks": 21113,
+        "impressions": 1575799,
+        "cpa": 5799.83,
+        "ctr": 1.34
       },
       {
         "value": "VERY_HIGH",
-        "cost": 83483.88,
-        "conversions": 14,
-        "clicks": 750,
-        "impressions": 71167,
-        "cpa": 5963.13,
-        "ctr": 1.05
+        "cost": 79117.77,
+        "conversions": 16,
+        "clicks": 727,
+        "impressions": 76761,
+        "cpa": 4944.86,
+        "ctr": 0.95
       }
     ],
     "Placement": [
       {
         "value": "Yandex",
-        "cost": 380302.06,
-        "conversions": 41,
-        "clicks": 3494,
-        "impressions": 64330,
-        "cpa": 9275.66,
-        "ctr": 5.43
+        "cost": 361847.21,
+        "conversions": 47,
+        "clicks": 3373,
+        "impressions": 60788,
+        "cpa": 7698.88,
+        "ctr": 5.55
       },
       {
         "value": "com.avito.android",
-        "cost": 25629.83,
-        "conversions": 4,
-        "clicks": 387,
-        "impressions": 45897,
-        "cpa": 6407.46,
-        "ctr": 0.84
-      },
-      {
-        "value": "com.edadeal.android",
-        "cost": 9203.4,
-        "conversions": 2,
-        "clicks": 19,
-        "impressions": 687,
-        "cpa": 4601.7,
-        "ctr": 2.77
+        "cost": 21659.4,
+        "conversions": 6,
+        "clicks": 311,
+        "impressions": 34644,
+        "cpa": 3609.9,
+        "ctr": 0.9
       },
       {
         "value": "com.vkontakte.android",
-        "cost": 25148.57,
-        "conversions": 1,
-        "clicks": 205,
-        "impressions": 17001,
-        "cpa": 25148.57,
-        "ctr": 1.21
+        "cost": 35453.6,
+        "conversions": 9,
+        "clicks": 261,
+        "impressions": 25379,
+        "cpa": 3939.29,
+        "ctr": 1.03
       },
       {
         "value": "dzen.ru",
-        "cost": 65103.58,
-        "conversions": 10,
-        "clicks": 2264,
-        "impressions": 157072,
-        "cpa": 6510.36,
-        "ctr": 1.44
+        "cost": 71591.2,
+        "conversions": 14,
+        "clicks": 2149,
+        "impressions": 158926,
+        "cpa": 5113.66,
+        "ctr": 1.35
       },
       {
         "value": "mail.ru",
-        "cost": 244756.93,
-        "conversions": 41,
-        "clicks": 7933,
-        "impressions": 231610,
-        "cpa": 5969.68,
-        "ctr": 3.43
+        "cost": 283378.76,
+        "conversions": 55,
+        "clicks": 7569,
+        "impressions": 206303,
+        "cpa": 5152.34,
+        "ctr": 3.67
       },
       {
         "value": "video.yandex.ru",
-        "cost": 63092.26,
+        "cost": 21968.91,
         "conversions": 5,
-        "clicks": 3886,
-        "impressions": 1150806,
-        "cpa": 12618.45,
-        "ctr": 0.34
+        "clicks": 2124,
+        "impressions": 729993,
+        "cpa": 4393.78,
+        "ctr": 0.29
       },
       {
         "value": "ya.ru",
-        "cost": 9100.18,
+        "cost": 9045.77,
         "conversions": 1,
-        "clicks": 91,
-        "impressions": 11696,
-        "cpa": 9100.18,
-        "ctr": 0.78
+        "clicks": 82,
+        "impressions": 11910,
+        "cpa": 9045.77,
+        "ctr": 0.69
+      },
+      {
+        "value": "yandex.ru",
+        "cost": 10677.94,
+        "conversions": 0,
+        "clicks": 133,
+        "impressions": 6720,
+        "cpa": 10677.94,
+        "ctr": 1.98
       }
     ],
     "Slot": [
       {
         "value": "COMMERCIAL_SEARCH",
-        "cost": 26015.65,
-        "conversions": 8,
-        "clicks": 368,
-        "impressions": 7755,
-        "cpa": 3251.96,
-        "ctr": 4.75
+        "cost": 23679.76,
+        "conversions": 12,
+        "clicks": 390,
+        "impressions": 7952,
+        "cpa": 1973.31,
+        "ctr": 4.9
+      },
+      {
+        "value": "MAPS_GEO_PRODUCT",
+        "cost": 9484.94,
+        "conversions": 0,
+        "clicks": 55,
+        "impressions": 199025,
+        "cpa": 9484.94,
+        "ctr": 0.03
       },
       {
         "value": "OTHER",
-        "cost": 636786.8,
-        "conversions": 92,
-        "clicks": 30489,
-        "impressions": 2203616,
-        "cpa": 6921.6,
-        "ctr": 1.38
+        "cost": 659893.59,
+        "conversions": 112,
+        "clicks": 22718,
+        "impressions": 1770544,
+        "cpa": 5891.91,
+        "ctr": 1.28
       },
       {
         "value": "PREMIUMBLOCK",
-        "cost": 303256.25,
-        "conversions": 28,
-        "clicks": 2646,
-        "impressions": 25412,
-        "cpa": 10830.58,
-        "ctr": 10.41
+        "cost": 294321.65,
+        "conversions": 34,
+        "clicks": 2555,
+        "impressions": 24293,
+        "cpa": 8656.52,
+        "ctr": 10.52
       },
       {
         "value": "SUGGEST",
-        "cost": 12079.24,
-        "conversions": 1,
-        "clicks": 66,
-        "impressions": 730,
-        "cpa": 12079.24,
-        "ctr": 9.04
+        "cost": 10271.59,
+        "conversions": 0,
+        "clicks": 70,
+        "impressions": 719,
+        "cpa": 10271.59,
+        "ctr": 9.74
       }
     ],
     "TargetingCategory": [
       {
         "value": "ACCESSORY",
-        "cost": 25370.65,
+        "cost": 24552.3,
         "conversions": 3,
-        "clicks": 359,
-        "impressions": 14435,
-        "cpa": 8456.88,
-        "ctr": 2.49
+        "clicks": 349,
+        "impressions": 14588,
+        "cpa": 8184.1,
+        "ctr": 2.39
       },
       {
         "value": "ALTERNATIVE",
-        "cost": 62191.09,
-        "conversions": 6,
-        "clicks": 691,
-        "impressions": 17780,
-        "cpa": 10365.18,
-        "ctr": 3.89
+        "cost": 68955.29,
+        "conversions": 4,
+        "clicks": 781,
+        "impressions": 18778,
+        "cpa": 17238.82,
+        "ctr": 4.16
       },
       {
         "value": "BROADER",
-        "cost": 70598.04,
-        "conversions": 8,
-        "clicks": 643,
-        "impressions": 8890,
-        "cpa": 8824.75,
-        "ctr": 7.23
+        "cost": 64622.75,
+        "conversions": 11,
+        "clicks": 601,
+        "impressions": 8664,
+        "cpa": 5874.8,
+        "ctr": 6.94
       },
       {
         "value": "EXACT",
-        "cost": 183998.94,
-        "conversions": 18,
-        "clicks": 1464,
-        "impressions": 20297,
-        "cpa": 10222.16,
-        "ctr": 7.21
+        "cost": 171372.62,
+        "conversions": 27,
+        "clicks": 1365,
+        "impressions": 16370,
+        "cpa": 6347.13,
+        "ctr": 8.34
       },
       {
         "value": "NARROW",
-        "cost": 27117.71,
-        "conversions": 5,
-        "clicks": 282,
-        "impressions": 2722,
-        "cpa": 5423.54,
-        "ctr": 10.36
+        "cost": 23514.57,
+        "conversions": 2,
+        "clicks": 217,
+        "impressions": 2137,
+        "cpa": 11757.28,
+        "ctr": 10.15
       },
       {
         "value": "UNKNOWN",
-        "cost": 622871.22,
-        "conversions": 90,
-        "clicks": 30228,
-        "impressions": 2363241,
-        "cpa": 6920.79,
-        "ctr": 1.28
+        "cost": 647493.22,
+        "conversions": 111,
+        "clicks": 22500,
+        "impressions": 1942234,
+        "cpa": 5833.27,
+        "ctr": 1.16
       }
     ],
     "TargetingLocationName": [
       {
         "value": "Balashiha",
-        "cost": 18478.46,
-        "conversions": 2,
-        "clicks": 361,
-        "impressions": 15761,
-        "cpa": 9239.23,
-        "ctr": 2.29
+        "cost": 11796.03,
+        "conversions": 1,
+        "clicks": 254,
+        "impressions": 14242,
+        "cpa": 11796.03,
+        "ctr": 1.78
       },
       {
         "value": "Himki",
-        "cost": 11372.84,
+        "cost": 13304.88,
         "conversions": 3,
-        "clicks": 154,
-        "impressions": 9262,
-        "cpa": 3790.95,
-        "ctr": 1.66
+        "clicks": 149,
+        "impressions": 12831,
+        "cpa": 4434.96,
+        "ctr": 1.16
+      },
+      {
+        "value": "Krasnogorsk",
+        "cost": 9045.48,
+        "conversions": 0,
+        "clicks": 103,
+        "impressions": 5736,
+        "cpa": 9045.48,
+        "ctr": 1.8
       },
       {
         "value": "Lubercy",
-        "cost": 12327.5,
+        "cost": 12849.14,
         "conversions": 0,
-        "clicks": 207,
-        "impressions": 8035,
-        "cpa": 12327.5,
-        "ctr": 2.58
+        "clicks": 170,
+        "impressions": 7873,
+        "cpa": 12849.14,
+        "ctr": 2.16
       },
       {
         "value": "Moscow",
-        "cost": 564692.36,
-        "conversions": 86,
-        "clicks": 20247,
-        "impressions": 639655,
-        "cpa": 6566.19,
-        "ctr": 3.17
+        "cost": 606201.89,
+        "conversions": 101,
+        "clicks": 16299,
+        "impressions": 663106,
+        "cpa": 6002.0,
+        "ctr": 2.46
       },
       {
         "value": "Moscow and Moscow Oblast",
-        "cost": 64839.19,
+        "cost": 76436.63,
         "conversions": 9,
-        "clicks": 1868,
-        "impressions": 56553,
-        "cpa": 7204.35,
-        "ctr": 3.3
+        "clicks": 1811,
+        "impressions": 71391,
+        "cpa": 8492.96,
+        "ctr": 2.54
+      },
+      {
+        "value": "Odincovo",
+        "cost": 8923.38,
+        "conversions": 3,
+        "clicks": 141,
+        "impressions": 5917,
+        "cpa": 2974.46,
+        "ctr": 2.38
+      },
+      {
+        "value": "Serpuhov",
+        "cost": 10046.09,
+        "conversions": 1,
+        "clicks": 69,
+        "impressions": 6171,
+        "cpa": 10046.09,
+        "ctr": 1.12
       }
     ]
   }
