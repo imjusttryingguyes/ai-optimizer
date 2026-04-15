@@ -2,9 +2,9 @@ name: Daily Update - Tab 1 (Account KPI)
 
 on:
   schedule:
-    # Every day at 23:00 UTC
-    - cron: '0 23 * * *'
-  workflow_dispatch:  # Manual trigger for testing
+    # Every day at 01:00 UTC
+    - cron: '0 1 * * *'
+  workflow_dispatch:
 
 jobs:
   update-data:

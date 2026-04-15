@@ -2,8 +2,8 @@ name: Weekly Update - Tabs 2 & 3 (Segments & Campaigns)
 
 on:
   schedule:
-    # Every Sunday at 23:00 UTC (updates Mon 00:00 UTC)
-    - cron: '0 23 * * 0'
+    # Every Monday at 01:00 UTC (Sunday 23:00 → Monday 01:00)
+    - cron: '0 1 * * 1'
   workflow_dispatch:  # Manual trigger for testing
 
 jobs:
